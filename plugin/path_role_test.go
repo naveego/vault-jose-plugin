@@ -3,9 +3,10 @@ package josejwt_test
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/vault/logical"
-	//. "github.com/naveego/vault-jose-plugin/plugin"
+	. "github.com/naveego/vault-jose-plugin/plugin"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -13,33 +14,33 @@ import (
 var _ = Describe("PathRole", func() {
 
 	var (
-		b        logical.Backend
-		storage  logical.Storage
-		roleData map[string]interface{}
-		roleName string
+		b         logical.Backend
+		storage   logical.Storage
+		roleEntry RoleStorageEntry
+		roleName  string
 	)
 
 	BeforeEach(func() {
 		roleName = "test-role"
 		b, storage = getTestBackend()
-		roleData = map[string]interface{}{
-			"name": roleName,
-			"allowed_custom_claims": []string{"overridable",
-				"exp"},
-			"iss":           "test-issuer",
-			"aud":           "test-audience",
-			"nbf":           true,
-			"key":           "test-key",
-			"max_token_ttl": 100,
-			"sub":           "test-subject",
-			"token_ttl":     5,
-			"exp":           true,
-			"type":          "jwt",
-			"claims": map[string]interface{}{
+		roleEntry = RoleStorageEntry{
+			Name: roleName,
+			Type: "jwt",
+
+			Key:                 "test-key",
+			MaxTokenTTL:         100 * time.Second,
+			TokenTTL:            5 * time.Second,
+			Issuer:              "test-issuer",
+			Audience:            "test-audience",
+			Subject:             "test-subject",
+			NotBefore:           true,
+			ExpirationTime:      true,
+			IssuedAt:            true,
+			AllowedCustomClaims: []string{"overridable", "exp"},
+			Claims: map[string]interface{}{
 				customClaimTye:       customClaimValue,
 				overridableClaimType: overridableClaimInitialValue,
 			},
-			"iat": true,
 		}
 	})
 
@@ -47,7 +48,7 @@ var _ = Describe("PathRole", func() {
 
 		It("should round trip role", func() {
 
-			Expect(createRole(b, storage, roleData)).ToNot(HaveLogicalError())
+			Expect(createRole(b, storage, roleEntry.ToMap())).ToNot(HaveLogicalError())
 
 			getReq := &logical.Request{
 				Operation: logical.ReadOperation,
@@ -58,23 +59,27 @@ var _ = Describe("PathRole", func() {
 			result, err := b.HandleRequest(context.Background(), getReq)
 			Expect(result, err).ToNot(HaveLogicalError())
 
-			Expect(result.Data).To(HaveKeyWithValue("key", "test-key"))
-			Expect(result.Data).To(HaveKeyWithValue("exp", true))
-			Expect(result.Data).To(HaveKeyWithValue("type", "jwt"))
-			Expect(result.Data).To(HaveKeyWithValue("sub", "test-subject"))
-			Expect(result.Data).To(HaveKeyWithValue("token_ttl", float64(5)))
-			Expect(result.Data).To(HaveKeyWithValue("iat", true))
-			Expect(result.Data).To(HaveKeyWithValue("name", "test-role"))
-			Expect(result.Data).To(HaveKeyWithValue("iss", "test-issuer"))
-			Expect(result.Data).To(HaveKeyWithValue("aud", "test-audience"))
-			Expect(result.Data).To(HaveKeyWithValue("nbf", true))
-			Expect(result.Data).To(HaveKeyWithValue("max_token_ttl", float64(100)))
-			Expect(result.Data).To(HaveKeyWithValue("allowed_custom_claims", BeEquivalentTo([]string{"overridable", "exp"})))
-			Expect(result.Data).To(HaveKeyWithValue("claims", BeEquivalentTo(map[string]interface{}{
-				"custom":      "custom-value",
-				"overridable": "overridable-value",
-			})))
-
+			Expect(result.Data).To(
+				And(
+					HaveKeyWithValue("key", "test-key"),
+					HaveKeyWithValue("exp", true),
+					HaveKeyWithValue("type", "jwt"),
+					HaveKeyWithValue("sub", "test-subject"),
+					HaveKeyWithValue("token_ttl", float64(5)),
+					HaveKeyWithValue("iat", true),
+					HaveKeyWithValue("name", "test-role"),
+					HaveKeyWithValue("iss", "test-issuer"),
+					HaveKeyWithValue("aud", "test-audience"),
+					HaveKeyWithValue("nbf", true),
+					HaveKeyWithValue("max_token_ttl", float64(100)),
+					HaveKeyWithValue("allowed_custom_claims", BeEquivalentTo([]string{"overridable", "exp"})),
+					HaveKeyWithValue("claims", BeEquivalentTo(map[string]interface{}{
+						"custom":      "custom-value",
+						"overridable": "overridable-value",
+					}),
+					),
+				),
+			)
 		})
 
 	})
@@ -83,7 +88,7 @@ var _ = Describe("PathRole", func() {
 
 		It("should delete role", func() {
 
-			Expect(createRole(b, storage, roleData)).ToNot(HaveLogicalError())
+			Expect(createRole(b, storage, roleEntry.ToMap())).ToNot(HaveLogicalError())
 
 			deleteReq := &logical.Request{
 				Operation: logical.DeleteOperation,

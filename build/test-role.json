@@ -2,5 +2,6 @@
     "key": "test-key",
     "iss": "http://127.0.0.1:8200/",
     "aud": "vandelay",
-    "sub": "user"
+    "sub": "user",
+    "type": "jwt"
 }

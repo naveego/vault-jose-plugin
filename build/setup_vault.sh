@@ -16,6 +16,6 @@ vault login root
 vault policy write jwt jwt_policy.hcl
 
 # install the jwt plugin
-vault write sys/plugins/catalog/jwt-secrets sha_256=$(cat /vault/plugins/jwt-secrets-plugin.sha) command=jwt-secrets-plugin
+vault write sys/plugins/catalog/jose sha_256=$(cat jose-plugin.sha) command=jose-plugin
 
-vault secrets enable --plugin-name=jwt-secrets --description="JWT token issuer" --path="jwt" plugin
+vault secrets enable --plugin-name=jose --description="JWT token issuer" --path="jose" plugin

@@ -132,7 +132,7 @@ func (backend *JwtBackend) createRole(ctx context.Context, req *logical.Request,
 			return logical.ErrorResponse("type must be a string"), nil
 		}
 
-		if role.Type != "jwt" && role.Type != "jws" && role.Type != "jwt" {
+		if role.Type != "jwt" && role.Type != "jws" && role.Type != "jwe" {
 			return logical.ErrorResponse("type must be one of jwt|jws|jwe"), nil
 		}
 	}

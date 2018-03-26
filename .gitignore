@@ -1,5 +1,6 @@
-.vscode/
-build/jwtplugin*
-vault_jwt_plugin
-jwt-plugin
-JWT-Secrets-Plugin
+
+vendor/
+vendor.orig/
+
+/build/jwt-secrets-plugin
+/build/jwt-secrets-plugin.sha

@@ -2,14 +2,24 @@ FROM golang:latest as builder
 
 WORKDIR /go/src/github.com/naveego/vault-jose-plugin
 
-RUN go get -d -v golang.org/x/net/html
+# install dep
+RUN go get github.com/golang/dep/cmd/dep
 
-COPY . .
+#install ginkgo
+RUN go get -u github.com/onsi/ginkgo/ginkgo 
 
-# RUN go get -v
-# RUN go test -v ./test/*
-# RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s" -a -installsuffix cgo -o build/jwt 
-# RUN shasum -a 256 -p build/jwt | cut -d ' ' -f 1 > "build/jwt.sha1"
+# add Gopkg.toml and Gopkg.lock
+ADD Gopkg.toml Gopkg.toml
+ADD Gopkg.lock Gopkg.lock
+
+# install packages
+RUN dep ensure -v --vendor-only
+
+ADD . .
+
+RUN go test -v ./...
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s" -a -installsuffix cgo -o build/jose-plugin
+RUN shasum -a 256 -p build/jose-plugin | cut -d ' ' -f 1 > "build/jose-plugin.sha"
 
 ## build the docker container with vault and the plugin mounted
 FROM vault:latest
