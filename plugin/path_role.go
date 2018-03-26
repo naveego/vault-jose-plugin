@@ -93,6 +93,31 @@ func (backend *JwtBackend) readRole(ctx context.Context, req *logical.Request, d
 
 	return &logical.Response{Data: role.ToMap()}, nil
 }
+func (backend *JwtBackend) readRoleJWKS(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	roleName := data.Get("name").(string)
+	role, err := backend.getRoleEntry(ctx, req.Storage, roleName)
+	if err != nil {
+		return logical.ErrorResponse("Error reading role"), err
+	}
+
+	if role == nil {
+		return logical.ErrorResponse("role not found"), nil
+	}
+
+	key, err := backend.getKeyEntry(ctx, req.Storage, role.Key)
+	if err != nil {
+		return logical.ErrorResponse("error reading key"), err
+	}
+	if key == nil {
+		return logical.ErrorResponse("key not found"), nil
+	}
+
+	if role == nil {
+		return nil, nil
+	}
+
+	return &logical.Response{Data: role.ToMap()}, nil
+}
 
 // create the role within plugin, this will provide the access for applications
 // to be able to create tokens down the line
@@ -215,6 +240,15 @@ claims and TTL settings of that role.`,
 				logical.UpdateOperation: backend.createRole,
 				logical.ReadOperation:   backend.readRole,
 				logical.DeleteOperation: backend.removeRole,
+			},
+		},
+		&framework.Path{
+			Pattern:      fmt.Sprintf("roles/%s/jwks", framework.GenericNameRegex("name")),
+			HelpSynopsis: "Returns the JWKS for the keys used by this role.",
+
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+
+				logical.ReadOperation: backend.readRole,
 			},
 		},
 	}
