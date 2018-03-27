@@ -93,10 +93,6 @@ func (backend *JwtBackend) getKeyEntry(ctx context.Context, storage logical.Stor
 	}
 	keyName = strings.ToLower(keyName)
 
-	lock := backend.keyLock(keyName)
-	lock.RLock()
-	defer lock.RUnlock()
-
 	result := new(KeyStorageEntry)
 	if entry, err := storage.Get(ctx, fmt.Sprintf("keys/%s", keyName)); err != nil {
 		return nil, err
@@ -129,14 +125,6 @@ func (backend *JwtBackend) setKeyEntry(ctx context.Context, storage logical.Stor
 	}
 
 	keyName := strings.ToLower(key.Name)
-
-	// TODO : put in all the validation for the key
-
-	// TODO : create the key if not set
-
-	lock := backend.keyLock(keyName)
-	lock.RLock()
-	defer lock.RUnlock()
 
 	entry := &logical.StorageEntry{
 		Key: fmt.Sprintf("keys/%s", keyName),

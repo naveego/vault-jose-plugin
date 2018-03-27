@@ -108,8 +108,8 @@ var _ = Describe("PathIssue", func() {
 			req := &logical.Request{
 				Storage: storage,
 				Data: map[string]interface{}{
-					"token":     token,
-					"role_name": roleName,
+					"token": token,
+					"role":  roleName,
 				},
 				Path:      fmt.Sprintf("token/validate/%s", roleName),
 				Operation: logical.UpdateOperation,
@@ -134,8 +134,8 @@ var _ = Describe("PathIssue", func() {
 			req := &logical.Request{
 				Storage: storage,
 				Data: map[string]interface{}{
-					"token":     token,
-					"role_name": roleName,
+					"token": token,
+					"role":  roleName,
 				},
 				Path:      fmt.Sprintf("token/validate/%s", roleName),
 				Operation: logical.UpdateOperation,
@@ -153,7 +153,7 @@ var _ = Describe("PathIssue", func() {
 // create the token given the parameters
 func createToken(b logical.Backend, storage logical.Storage, roleName string, ttl time.Duration, claims map[string]interface{}) (*logical.Response, error) {
 	data := map[string]interface{}{
-		"role_name": roleName,
+		"role":      roleName,
 		"token_ttl": ttl.Seconds(),
 	}
 

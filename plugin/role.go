@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/fatih/structs"
-	"github.com/hashicorp/vault/helper/locksutil"
 	"github.com/hashicorp/vault/logical"
 )
 
@@ -55,11 +54,6 @@ func (r RoleStorageEntry) ToMap() map[string]interface{} {
 	return roleDetails
 }
 
-// get or create the basic lock for the role name
-func (backend *JwtBackend) roleLock(roleName string) *locksutil.LockEntry {
-	return locksutil.LockForKey(backend.roleLocks, roleName)
-}
-
 // roleSave will persist the role in the data store
 func (backend *JwtBackend) setRoleEntry(ctx context.Context, storage logical.Storage, role RoleStorageEntry) error {
 	if role.Name == "" {
@@ -67,10 +61,6 @@ func (backend *JwtBackend) setRoleEntry(ctx context.Context, storage logical.Sto
 	}
 
 	roleName := strings.ToLower(role.Name)
-
-	lock := backend.roleLock(roleName)
-	lock.RLock()
-	defer lock.RUnlock()
 
 	entry, err := logical.StorageEntryJSON(fmt.Sprintf("role/%s", roleName), role)
 
@@ -91,10 +81,6 @@ func (backend *JwtBackend) deleteRoleEntry(ctx context.Context, storage logical.
 		return fmt.Errorf("missing role name")
 	}
 	roleName = strings.ToLower(roleName)
-
-	lock := backend.roleLock(roleName)
-	lock.RLock()
-	defer lock.RUnlock()
 
 	return storage.Delete(ctx, fmt.Sprintf("role/%s", roleName))
 }

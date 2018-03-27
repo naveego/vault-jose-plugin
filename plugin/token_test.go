@@ -43,7 +43,7 @@ var _ = Describe("ValidateJWTToken", func() {
 			}
 
 			actual := getJWT(TokenCreateEntry{
-				RoleName: role.Name,
+				Role: role.Name,
 			}, role, key)
 
 			Expect(ValidateJWTToken(actual, role, key)).To(Succeed())
@@ -66,7 +66,7 @@ var _ = Describe("ValidateJWTToken", func() {
 			}
 
 			actual := getJWT(TokenCreateEntry{
-				RoleName: role.Name,
+				Role: role.Name,
 			}, role, key)
 
 			Expect(ValidateJWTToken(actual, role, key)).To(Succeed())
@@ -112,7 +112,7 @@ var _ = Describe("CreateJWTToken", func() {
 			}
 
 			claims, privateClaims := getJWT(TokenCreateEntry{
-				RoleName: role.Name,
+				Role: role.Name,
 			}, role, key)
 			Expect(claims).ToNot(BeNil())
 			Expect(privateClaims).ToNot(BeNil())
@@ -136,7 +136,7 @@ var _ = Describe("CreateJWTToken", func() {
 			}
 
 			claims, privateClaims := getJWT(TokenCreateEntry{
-				RoleName: role.Name,
+				Role: role.Name,
 			}, role, key)
 			Expect(claims).ToNot(BeNil())
 			Expect(privateClaims).ToNot(BeNil())
@@ -159,7 +159,7 @@ var _ = Describe("CreateJWTToken", func() {
 		// 	}
 
 		// 	actual := getJWT(TokenCreateEntry{
-		// 		RoleName: role.Name,
+		// 		Role: role.Name,
 		// 	}, role, key)
 
 		// 	signingMethod := jws.GetSigningMethod(key.Algorithm)
@@ -219,7 +219,7 @@ var _ = Describe("CreateJWTToken", func() {
 		It("should sign token and set all registered claims", func() {
 
 			claims, _ := getJWT(TokenCreateEntry{
-				RoleName: role.Name,
+				Role: role.Name,
 			}, role, key)
 
 			Expect(claims.Validate(jwt.Expected{
@@ -246,7 +246,7 @@ var _ = Describe("CreateJWTToken", func() {
 
 			It("should place custom claims in role", func() {
 				_, privateClaims := getJWT(TokenCreateEntry{
-					RoleName: role.Name,
+					Role: role.Name,
 				}, role, key)
 
 				Expect(privateClaims).To(
@@ -258,7 +258,7 @@ var _ = Describe("CreateJWTToken", func() {
 
 			It("should assign allowed custom claims from request to token", func() {
 				_, privateClaims := getJWT(TokenCreateEntry{
-					RoleName: role.Name,
+					Role: role.Name,
 					Claims: map[string]interface{}{
 						"overridable": "overridden-value",
 					},
@@ -272,7 +272,7 @@ var _ = Describe("CreateJWTToken", func() {
 
 			It("should not assign disallowed custom claims from request to token", func() {
 				_, privateClaims := getJWT(TokenCreateEntry{
-					RoleName: role.Name,
+					Role: role.Name,
 					Claims: map[string]interface{}{
 						"custom": "overridden-value",
 					},

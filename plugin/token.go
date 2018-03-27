@@ -18,9 +18,7 @@ type TokenCreateEntry struct {
 
 	Claims map[string]interface{} `json:"claims" structs:"claims" mapstructure:"claims"`
 
-	RoleName string `json:"role_name" structs:"role_name" mapstructure:"role_name"`
-
-	RoleID string `json:"role_id" structs:"role_id" mapstructure:"role_id"`
+	Role string `json:"role" structs:"role" mapstructure:"role"`
 
 	KeyName string `json:"key_name" structs:"key_name" mapstructure:"key_name"`
 }

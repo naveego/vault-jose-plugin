@@ -14,18 +14,7 @@ import (
 // basic schema for the validation of the token,
 // this will map the fields coming in from the vault request field map
 var validateTokenSchema = map[string]*framework.FieldSchema{
-	"role_name": {
-		Type:        framework.TypeString,
-		Description: "The role associated with this token",
-	},
-	"token": {
-		Type:        framework.TypeString,
-		Description: "The Token to validate",
-	},
-}
-
-var refreshTokenSchema = map[string]*framework.FieldSchema{
-	"role_name": {
+	"role": {
 		Type:        framework.TypeString,
 		Description: "The role associated with this token",
 	},
@@ -39,7 +28,7 @@ var refreshTokenSchema = map[string]*framework.FieldSchema{
 // this will map the fields coming in from the vault request field map
 var createTokenSchema = map[string]*framework.FieldSchema{
 
-	"role_name": {
+	"role": {
 		Type:        framework.TypeString,
 		Description: "The name of the role to use to create the token",
 	},
@@ -57,8 +46,8 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 func (backend *JwtBackend) issueToken(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
 	tokenEntry := TokenCreateEntry{
-		RoleName: data.Get("role_name").(string),
-		Claims:   data.Get("claims").(map[string]interface{}),
+		Role:   data.Get("role").(string),
+		Claims: data.Get("claims").(map[string]interface{}),
 	}
 
 	if tokenTTL, ok := data.Get("token_ttl").(int); ok {
@@ -66,15 +55,15 @@ func (backend *JwtBackend) issueToken(ctx context.Context, req *logical.Request,
 	}
 
 	// get the role by name
-	roleEntry, err := backend.getRoleEntry(ctx, req.Storage, tokenEntry.RoleName)
+	roleEntry, err := backend.getRoleEntry(ctx, req.Storage, tokenEntry.Role)
 	if roleEntry == nil || err != nil {
-		err = fmt.Errorf("Role name %q not recognised", tokenEntry.RoleName)
+		err = fmt.Errorf("role %q not recognised", tokenEntry.Role)
 		return logical.ErrorResponse(err.Error()), err
 	}
 
 	keyEntry, err := backend.getKeyEntry(ctx, req.Storage, roleEntry.Key)
 	if keyEntry == nil || err != nil {
-		err = fmt.Errorf(fmt.Sprintf("Key name %q for role name %q not recognized", roleEntry.Key, tokenEntry.RoleName))
+		err = fmt.Errorf(fmt.Sprintf("key %q for role %q not recognized", roleEntry.Key, tokenEntry.Role))
 		return logical.ErrorResponse(err.Error()), err
 	}
 
@@ -118,9 +107,9 @@ func (backend *JwtBackend) validateToken(ctx context.Context, req *logical.Reque
 		ok       bool
 	)
 
-	roleName, ok = data.Get("role_name").(string)
+	roleName, ok = data.Get("role").(string)
 	if !ok {
-		return logical.ErrorResponse("role_name was missing"), nil
+		return logical.ErrorResponse("role was missing"), nil
 	}
 
 	// get the role by name
@@ -177,7 +166,7 @@ func (backend *JwtBackend) refreshToken(ctx context.Context, req *logical.Reques
 	// 	return logical.ErrorResponse("unable to parse token"), err
 	// }
 
-	// roleName := data.Get("role_name").(string)
+	// roleName := data.Get("role").(string)
 	// if roleName == "" {
 	// 	roleName = token.Claims().Get("role-name").(string)
 	// }
@@ -244,21 +233,14 @@ func contains(array []string, value string) bool {
 func pathToken(backend *JwtBackend) []*framework.Path {
 	paths := []*framework.Path{
 		&framework.Path{
-			Pattern: fmt.Sprintf("token/issue/%s", framework.GenericNameRegex("role_name")),
+			Pattern: fmt.Sprintf("token/issue/%s", framework.GenericNameRegex("role")),
 			Fields:  createTokenSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.UpdateOperation: backend.issueToken,
 			},
 		},
 		&framework.Path{
-			Pattern: fmt.Sprintf("token/refresh/%s", framework.GenericNameRegex("role_name")),
-			Fields:  refreshTokenSchema,
-			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.UpdateOperation: backend.refreshToken,
-			},
-		},
-		&framework.Path{
-			Pattern: fmt.Sprintf("token/validate/%s", framework.GenericNameRegex("role_name")),
+			Pattern: fmt.Sprintf("token/validate/%s", framework.GenericNameRegex("role")),
 			Fields:  validateTokenSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.UpdateOperation: backend.validateToken,

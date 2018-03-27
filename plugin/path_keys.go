@@ -6,7 +6,6 @@ import (
 
 	"gopkg.in/square/go-jose.v2"
 
-	"github.com/hashicorp/vault/helper/locksutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
@@ -28,11 +27,6 @@ var createKeySchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "The algorithm (from JWA). Required if 'jwk' is not set.",
 	},
-}
-
-// get or create the basic lock for the key name
-func (backend *JwtBackend) keyLock(keyName string) *locksutil.LockEntry {
-	return locksutil.LockForKey(backend.keyLocks, keyName)
 }
 
 func (backend *JwtBackend) createKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {

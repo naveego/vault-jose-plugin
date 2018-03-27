@@ -85,11 +85,7 @@ func (backend *JwtBackend) invalidate(ctx context.Context, key string) {
 // Backend export the function to create backend and configure
 func Backend(ctx context.Context, conf *logical.BackendConfig) *JwtBackend {
 	backend := &JwtBackend{
-		view:        conf.StorageView,
-		roleLocks:   locksutil.CreateLocks(),
-		secretLocks: locksutil.CreateLocks(),
-		keyLocks:    locksutil.CreateLocks(),
-		claimLocks:  locksutil.CreateLocks(),
+		view: conf.StorageView,
 	}
 
 	backend.Backend = &framework.Backend{
