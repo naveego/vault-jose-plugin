@@ -7,5 +7,11 @@
         "**/.DS_Store": true,
         "vendor": true
     },
-    "go.buildTags": "integration"
+    "go.buildTags": "integration",
+    "go.addTags": {
+        "tags": "json,structs,mapstructure",
+        "options": "",
+        "promptForTags": false,
+        "transform": "snakecase"
+    },
 }

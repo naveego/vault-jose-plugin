@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/fatih/structs"
+	"gopkg.in/square/go-jose.v2"
+
 	"github.com/hashicorp/vault/helper/locksutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
-	"github.com/mitchellh/mapstructure"
 )
 
 var createKeySchema = map[string]*framework.FieldSchema{
@@ -16,22 +16,18 @@ var createKeySchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "The intended endpoints of the token to validate the claim",
 	},
+	"jwk": {
+		Type:        framework.TypeString,
+		Description: "The JWK for the key, including the private key, as a string.",
+	},
+	"use": {
+		Type:        framework.TypeString,
+		Description: "The usage of this key, 'enc' or 'sig'. Required if 'jwk' is not set.",
+	},
 	"alg": {
 		Type:        framework.TypeString,
-		Description: "The algorithm to use for creating keys",
+		Description: "The algorithm (from JWA). Required if 'jwk' is not set.",
 	},
-	"private_key": {
-		Type:        framework.TypeString,
-		Description: "The unencrypted private key for the pem",
-	},
-	// "enc": {
-	// 	Type:        framework.TypeString,
-	// 	Description: "the type of encryption to use when encypting the keys",
-	// },
-	// "enc_private_key": {
-	// 	Type:        framework.TypeString,
-	// 	Description: "The encrypted private key",
-	// },
 }
 
 // get or create the basic lock for the key name
@@ -39,7 +35,7 @@ func (backend *JwtBackend) keyLock(keyName string) *locksutil.LockEntry {
 	return locksutil.LockForKey(backend.keyLocks, keyName)
 }
 
-func (backend *JwtBackend) createUpdateKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) createKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	keyName := data.Get("name").(string)
 	key, err := backend.getKeyEntry(ctx, req.Storage, keyName)
 	if err != nil {
@@ -50,20 +46,67 @@ func (backend *JwtBackend) createUpdateKey(ctx context.Context, req *logical.Req
 		return logical.ErrorResponse(fmt.Sprintf("key with provided name '%s' already exists", keyName)), nil
 	}
 
-	var storageEntry KeyStorageEntry
-	if err := mapstructure.Decode(data.Raw, &storageEntry); err != nil {
-		return logical.ErrorResponse("Error decoding key"), err
+	return backend.createUpdateKey(ctx, req, data)
+}
+
+func (backend *JwtBackend) updateKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	keyName := data.Get("name").(string)
+	key, err := backend.getKeyEntry(ctx, req.Storage, keyName)
+	if err != nil {
+		return logical.ErrorResponse("error reading key"), err
 	}
 
-	if storageEntry.PrivateKey == "" {
-		if err := GeneratePublicAndPrivateKeys(&storageEntry); err != nil {
-			return logical.ErrorResponse(fmt.Sprintf("could not generate keys for algorithm %q", key.Algorithm)), err
+	if key == nil {
+		return logical.ErrorResponse(fmt.Sprintf("key with provided name '%s' does not exist", keyName)), nil
+	}
+
+	return backend.createUpdateKey(ctx, req, data)
+}
+
+func (backend *JwtBackend) createUpdateKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	keyName := data.Get("name").(string)
+
+	storageEntry := KeyStorageEntry{
+		Name: keyName,
+	}
+
+	if privateKeyJSON, ok := data.GetOk("jwk"); ok {
+
+		storageEntry.PrivateKey = new(jose.JSONWebKey)
+
+		if err := storageEntry.PrivateKey.UnmarshalJSON([]byte(privateKeyJSON.(string))); err != nil {
+			return logical.ErrorResponse(fmt.Sprintf("error decoding JWK: %s", err)), err
+		}
+
+		publicKey := storageEntry.PrivateKey.Public()
+		storageEntry.PublicKey = &publicKey
+
+	} else {
+
+		var (
+			alg interface{}
+			use interface{}
+			ok  bool
+		)
+		if alg, ok = data.GetOk("alg"); !ok {
+			return logical.ErrorResponse("alg is required"), nil
+		}
+		if use, ok = data.GetOk("use"); !ok {
+			return logical.ErrorResponse("use is required"), nil
+		}
+
+		if err := GeneratePublicAndPrivateKeys(&storageEntry, alg.(string), use.(string)); err != nil {
+			return logical.ErrorResponse(fmt.Sprintf("could not generate keys for algorithm %q", alg)), err
 		}
 	}
 
-	backend.setKeyEntry(ctx, req.Storage, storageEntry)
+	err := backend.setKeyEntry(ctx, req.Storage, storageEntry)
+	if err != nil {
+		return logical.ErrorResponse("error saving key"), err
+	}
 
-	return &logical.Response{}, nil
+	return backend.readKey(ctx, req, data)
+
 }
 
 func (backend *JwtBackend) readKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
@@ -73,43 +116,47 @@ func (backend *JwtBackend) readKey(ctx context.Context, req *logical.Request, da
 	if err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Unable to retrieve key %s", keyName)), nil
 	} else if key == nil {
-		return logical.ErrorResponse(fmt.Sprintf("Key %s does not exist", keyName)), nil
+		return nil, nil
 	}
 
-	keyDetails := structs.New(key).Map()
-	delete(keyDetails, "private_key")
-	delete(keyDetails, "enc_private_key")
+	publicKey, _ := key.PublicKey.MarshalJSON()
 
-	return &logical.Response{Data: keyDetails}, nil
+	return &logical.Response{Data: map[string]interface{}{
+		"public_key": publicKey,
+	}}, nil
 }
 
-func (backend *JwtBackend) readJWK(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-
+func (backend *JwtBackend) deleteKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	keyName := data.Get("name").(string)
 
-	key, err := backend.getKeyEntry(ctx, req.Storage, keyName)
-	if err != nil {
-		return logical.ErrorResponse(fmt.Sprintf("Unable to retrieve key %s", keyName)), nil
-	} else if key == nil {
-		return logical.ErrorResponse(fmt.Sprintf("Key %s does not exist", keyName)), nil
+	if err := backend.deleteKeyEntry(ctx, req.Storage, keyName); err != nil {
+		return logical.ErrorResponse(fmt.Sprintf("error deleting key: %s", err)), err
 	}
 
-	keyDetails := structs.New(key).Map()
-	delete(keyDetails, "private_key")
-	delete(keyDetails, "enc_private_key")
-
-	return &logical.Response{Data: keyDetails}, nil
+	return &logical.Response{Data: map[string]interface{}{
+		"result": fmt.Sprintf("key with name %q was deleted (if it existed)", keyName),
+	}}, nil
 }
 
 // set up the paths for the roles within vault
 func pathKeys(backend *JwtBackend) []*framework.Path {
 	paths := []*framework.Path{
 		&framework.Path{
-			Pattern: fmt.Sprintf("keys/%s", framework.GenericNameRegex("name")),
-			Fields:  createKeySchema,
+			Pattern:      fmt.Sprintf("keys/%s", framework.GenericNameRegex("name")),
+			Fields:       createKeySchema,
+			HelpSynopsis: "This path handles CRUD operations on keys.",
+			HelpDescription: `
+Keys can be provided by the user or generated by the JOSE secrets engine.
+
+To generate a key, include the properties 'alg' and 'use', and do not provide a value for 'jwk'.
+
+To use an existing key, set the property 'jwk' to a string containing the JWK form of the key.
+			`,
+
 			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.CreateOperation: backend.createUpdateKey,
-				logical.UpdateOperation: backend.createUpdateKey,
+				logical.CreateOperation: backend.createKey,
+				logical.UpdateOperation: backend.updateKey,
+				logical.DeleteOperation: backend.deleteKey,
 				logical.ReadOperation:   backend.readKey,
 			},
 		},

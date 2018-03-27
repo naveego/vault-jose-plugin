@@ -2,6 +2,7 @@ package josejwt
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -95,13 +96,20 @@ func Backend(ctx context.Context, conf *logical.BackendConfig) *JwtBackend {
 		BackendType: logical.TypeLogical,
 		//		AuthRenew:   backend.pathAuthRenew,
 		PathsSpecial: &logical.Paths{
-			Unauthenticated: []string{"token/validate"},
+			Unauthenticated: []string{
+				"token/validate",
+				fmt.Sprintf("roles/%s/jwks", framework.GenericNameRegex("name")),
+			},
+			SealWrapStorage: []string{
+				"keys/",
+			},
 		},
 		Invalidate: backend.invalidate,
 		Paths: framework.PathAppend(
 			pathToken(backend),
 			pathKeys(backend),
 			pathRole(backend),
+			pathConfig(backend),
 		),
 	}
 

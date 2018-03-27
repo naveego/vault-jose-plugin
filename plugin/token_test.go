@@ -3,9 +3,9 @@ package josejwt_test
 import (
 	"time"
 
-	"github.com/SermoDigital/jose/crypto"
-	"github.com/SermoDigital/jose/jws"
-	"github.com/SermoDigital/jose/jwt"
+	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
+
 	//. "github.com/onsi/ginkgo/extensions/table"
 
 	. "github.com/naveego/vault-jose-plugin/plugin"
@@ -27,16 +27,19 @@ var _ = Describe("ValidateJWTToken", func() {
 
 		It("should support hs*", func() {
 			key := KeyStorageEntry{
-				Name:       "test-key",
-				Algorithm:  crypto.SigningMethodHS256.Name,
-				PrivateKey: "test-key",
+				Name: "test-key",
+				PrivateKey: &jose.JSONWebKey{
+					Key:       []byte("test-key"),
+					Algorithm: string(jose.HS256),
+				},
 			}
 
 			role := RoleStorageEntry{
-				Name:     "test-role",
-				Type:     "jwt",
-				Key:      key.Name,
-				TokenTTL: time.Second * 100,
+				Name:           "test-role",
+				Type:           "jwt",
+				Key:            key.Name,
+				TokenTTL:       time.Second * 100,
+				ExpirationTime: true,
 			}
 
 			actual := getJWT(TokenCreateEntry{
@@ -49,17 +52,17 @@ var _ = Describe("ValidateJWTToken", func() {
 		It("should support rs*", func() {
 
 			key := KeyStorageEntry{
-				Name:      "test-key",
-				Algorithm: crypto.SigningMethodRS256.Name,
+				Name: "test-key",
 			}
 
-			Expect(GeneratePublicAndPrivateKeys(&key)).To(Succeed())
+			Expect(GeneratePublicAndPrivateKeys(&key, string(jose.RS256), "sig")).To(Succeed())
 
 			role := RoleStorageEntry{
-				Name:     "test-role",
-				Type:     "jwt",
-				Key:      key.Name,
-				TokenTTL: 100,
+				Name:           "test-role",
+				Type:           "jwt",
+				Key:            key.Name,
+				TokenTTL:       100,
+				ExpirationTime: true,
 			}
 
 			actual := getJWT(TokenCreateEntry{
@@ -76,61 +79,67 @@ var _ = Describe("CreateJWTToken", func() {
 
 	Describe("signing", func() {
 
-		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k KeyStorageEntry) jwt.JWT {
+		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k KeyStorageEntry) (claims jwt.Claims, privateClaims map[string]interface{}) {
 			actualBytes, err := CreateJWTToken(t, r, k)
 			Expect(err).ToNot(HaveOccurred())
 
-			actual, err := jws.ParseJWT(actualBytes)
+			actual, err := jwt.ParseSigned(string(actualBytes))
 			Expect(err).ToNot(HaveOccurred())
-			return actual
+			if k.PrivateKey.Algorithm == string(jose.HS256) {
+				Expect(actual.Claims(k.PrivateKey, &claims, &privateClaims)).To(Succeed())
+			} else {
+				Expect(actual.Claims(k.PublicKey, &claims, &privateClaims)).To(Succeed())
+			}
+
+			return
 		}
 
 		It("should support hs*", func() {
 			key := KeyStorageEntry{
-				Name:       "test-key",
-				Algorithm:  crypto.SigningMethodHS256.Name,
-				PrivateKey: "test-key",
+				Name: "test-key",
+				PrivateKey: &jose.JSONWebKey{
+					Key:       []byte("test-key"),
+					Algorithm: string(jose.HS256),
+				},
 			}
 
 			role := RoleStorageEntry{
-				Name:     "test-role",
-				Type:     "jwt",
-				Key:      key.Name,
-				TokenTTL: 100,
+				Name:           "test-role",
+				Type:           "jwt",
+				Key:            key.Name,
+				TokenTTL:       100,
+				ExpirationTime: true,
 			}
 
-			actual := getJWT(TokenCreateEntry{
+			claims, privateClaims := getJWT(TokenCreateEntry{
 				RoleName: role.Name,
 			}, role, key)
+			Expect(claims).ToNot(BeNil())
+			Expect(privateClaims).ToNot(BeNil())
 
-			signingMethod := jws.GetSigningMethod(key.Algorithm)
-			Expect(actual.Validate([]byte(key.PrivateKey), signingMethod)).To(Succeed())
 		})
 
 		It("should support rs*", func() {
 
 			key := KeyStorageEntry{
-				Name:      "test-key",
-				Algorithm: crypto.SigningMethodRS256.Name,
+				Name: "test-key",
 			}
 
-			Expect(GeneratePublicAndPrivateKeys(&key)).To(Succeed())
+			Expect(GeneratePublicAndPrivateKeys(&key, string(jose.RS256), "sig")).To(Succeed())
 
 			role := RoleStorageEntry{
-				Name:     "test-role",
-				Type:     "jwt",
-				Key:      key.Name,
-				TokenTTL: 100,
+				Name:           "test-role",
+				Type:           "jwt",
+				Key:            key.Name,
+				TokenTTL:       100,
+				ExpirationTime: true,
 			}
 
-			actual := getJWT(TokenCreateEntry{
+			claims, privateClaims := getJWT(TokenCreateEntry{
 				RoleName: role.Name,
 			}, role, key)
-
-			signingMethod := jws.GetSigningMethod(key.Algorithm)
-			publicKey, err := crypto.ParseRSAPublicKeyFromPEM([]byte(key.PublicKey))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(actual.Validate(publicKey, signingMethod)).To(Succeed())
+			Expect(claims).ToNot(BeNil())
+			Expect(privateClaims).ToNot(BeNil())
 		})
 
 		// DescribeTable("elliptic curve", func(method string) {
@@ -170,21 +179,25 @@ var _ = Describe("CreateJWTToken", func() {
 			role RoleStorageEntry
 		)
 
-		getJWT := func(t TokenCreateEntry) jwt.JWT {
-			actualBytes, err := CreateJWTToken(t, role, key)
+		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k KeyStorageEntry) (claims jwt.Claims, privateClaims map[string]interface{}) {
+			actualBytes, err := CreateJWTToken(t, r, k)
 			Expect(err).ToNot(HaveOccurred())
 
-			actual, err := jws.ParseJWT(actualBytes)
+			actual, err := jwt.ParseSigned(string(actualBytes))
 			Expect(err).ToNot(HaveOccurred())
-			return actual
+
+			Expect(actual.Claims(k.PrivateKey.Key, &claims, &privateClaims)).To(Succeed())
+			return
 		}
 
 		BeforeEach(func() {
 
 			key = KeyStorageEntry{
-				Name:       "test-key",
-				Algorithm:  crypto.SigningMethodHS256.Name,
-				PrivateKey: "test-key",
+				Name: "test-key",
+				PrivateKey: &jose.JSONWebKey{
+					Key:       []byte("test-key"),
+					Algorithm: string(jose.HS256),
+				},
 			}
 
 			role = RoleStorageEntry{
@@ -205,21 +218,22 @@ var _ = Describe("CreateJWTToken", func() {
 
 		It("should sign token and set all registered claims", func() {
 
-			actual := getJWT(TokenCreateEntry{
+			claims, _ := getJWT(TokenCreateEntry{
 				RoleName: role.Name,
-			})
+			}, role, key)
 
-			claims := actual.Claims()
+			Expect(claims.Validate(jwt.Expected{
+				Audience: []string{role.Audience},
+				Subject:  role.Subject,
+				Issuer:   role.Issuer,
+				Time:     time.Now(),
+			}))
 
-			Expect(claims).To(And(HaveKeyWithValue("aud", role.Audience),
-				HaveKeyWithValue("sub", role.Subject),
-				HaveKeyWithValue("iss", role.Issuer),
-				HaveKey("jti"),
-				HaveKeyWithValue("exp", BeFloatTimestampCloseTo(time.Now().Add(role.TokenTTL), time.Second)),
-				HaveKeyWithValue("nbf", BeFloatTimestampCloseTo(time.Now(), time.Second)),
-				HaveKeyWithValue("iat", BeFloatTimestampCloseTo(time.Now(), time.Second)),
-			))
+			Expect(claims.NotBefore.Time()).To(BeTemporally("~", time.Now(), time.Second))
+			Expect(claims.IssuedAt.Time()).To(BeTemporally("~", time.Now(), time.Second))
+			Expect(claims.Expiry.Time()).To(BeTemporally("~", time.Now().Add(role.TokenTTL), time.Second))
 		})
+
 		Describe("custom claims in role", func() {
 
 			BeforeEach(func() {
@@ -231,10 +245,11 @@ var _ = Describe("CreateJWTToken", func() {
 			})
 
 			It("should place custom claims in role", func() {
-				actual := getJWT(TokenCreateEntry{
+				_, privateClaims := getJWT(TokenCreateEntry{
 					RoleName: role.Name,
-				})
-				Expect(actual.Claims()).To(
+				}, role, key)
+
+				Expect(privateClaims).To(
 					And(
 						HaveKeyWithValue("custom", "original-custom-value"),
 						HaveKeyWithValue("overridable", "original-overridable-value"),
@@ -242,13 +257,13 @@ var _ = Describe("CreateJWTToken", func() {
 			})
 
 			It("should assign allowed custom claims from request to token", func() {
-				actual := getJWT(TokenCreateEntry{
+				_, privateClaims := getJWT(TokenCreateEntry{
 					RoleName: role.Name,
 					Claims: map[string]interface{}{
 						"overridable": "overridden-value",
 					},
-				})
-				Expect(actual.Claims()).To(
+				}, role, key)
+				Expect(privateClaims).To(
 					And(
 						HaveKeyWithValue("custom", "original-custom-value"),
 						HaveKeyWithValue("overridable", "overridden-value"),
@@ -256,13 +271,13 @@ var _ = Describe("CreateJWTToken", func() {
 			})
 
 			It("should not assign disallowed custom claims from request to token", func() {
-				actual := getJWT(TokenCreateEntry{
+				_, privateClaims := getJWT(TokenCreateEntry{
 					RoleName: role.Name,
 					Claims: map[string]interface{}{
 						"custom": "overridden-value",
 					},
-				})
-				Expect(actual.Claims()).To(
+				}, role, key)
+				Expect(privateClaims).To(
 					HaveKeyWithValue("custom", "original-custom-value"),
 				)
 			})

@@ -3,15 +3,14 @@ package josejwt_test
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	jose "gopkg.in/square/go-jose.v2"
 
 	//	. "github.com/naveego/vault-jose-plugin/plugin"
 
-	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
 
 	"github.com/hashicorp/vault/logical"
@@ -39,9 +38,8 @@ var _ = Describe("PathIssue", func() {
 		roleName = "test-role"
 		b, storage = getTestBackend()
 		keyEntry = map[string]interface{}{
-			"name":        keyName,
-			"alg":         crypto.SigningMethodHS256.Name,
-			"private_key": "test-key",
+			"name": keyName,
+			"jwk":  jose.JSONWebKey{Key: []byte("test-key"), Algorithm: string(jose.HS256)},
 		}
 		Expect(createKey(b, storage, keyEntry)).ToNot(HaveLogicalError())
 
@@ -87,7 +85,7 @@ var _ = Describe("PathIssue", func() {
 
 			Expect(jwt.Claims()).To(
 				And(
-					HaveKeyWithValue("aud", roleData["aud"]),
+					HaveKeyWithValue("aud", ContainElement("test-audience")),
 					HaveKeyWithValue("sub", roleData["sub"]),
 					HaveKeyWithValue("iss", roleData["iss"]),
 					HaveKeyWithValue(customClaimTye, customClaimValue),
@@ -96,10 +94,6 @@ var _ = Describe("PathIssue", func() {
 					HaveKeyWithValue("iat", BeFloatTimestampCloseTo(time.Now(), time.Second)),
 					HaveKeyWithValue("exp", BeFloatTimestampCloseTo(time.Now().Add(time.Second*10), time.Second)),
 				))
-
-			alg := jws.GetSigningMethod(keyEntry["alg"].(string))
-			Expect(jwt.Validate([]byte(keyEntry["private_key"].(string)), alg)).To(Succeed())
-
 		})
 	})
 
@@ -151,56 +145,10 @@ var _ = Describe("PathIssue", func() {
 			Expect(resp, err).ToNot(HaveLogicalError())
 
 			Expect(resp.Data).To(HaveKeyWithValue("is_valid", false))
-			Expect(resp.Data).To(HaveKeyWithValue("error", "token is expired"))
+			Expect(resp.Data).To(HaveKeyWithValue("error", ContainSubstring("token is expired")))
 		})
 	})
 })
-
-func TestIssueValidateToken(t *testing.T) {
-	// TODO: implemented validation
-	// b, storage := getTestBackend(t)
-	// roleName := "test_role"
-	// resp, _ := createSampleRole(b, storage, roleName, "")
-
-	// req := &logical.Request{
-	// 	Storage:     storage,
-	// 	DisplayName: fmt.Sprintf("test-%s", roleName),
-	// }
-
-	// resp, err := createToken(req, b, t, roleName, "")
-	// if err != nil || (resp != nil && resp.IsError()) {
-	// 	t.Fatalf("err:%s resp:%#v\n", err, resp)
-	// }
-
-	// if resp.Data["ClientToken"] == "" {
-	// 	t.Fatal("no token returned\n")
-	// }
-
-	// clientToken := resp.Data["ClientToken"].(string)
-	// log.Println(clientToken)
-
-	// // with a 1 second timeout this should still return a valid token
-	// time.Sleep(time.Duration(1) * time.Second)
-	// validateToken(req, b, t, clientToken, roleName, true)
-	// validateToken(req, b, t, clientToken, roleName, true)
-
-	// // with a two second timeout this should fail vaildation
-	// time.Sleep(time.Duration(2) * time.Second)
-	// validateToken(req, b, t, clientToken, roleName, false)
-
-	// // now to recreate a token and test its valid once again
-	// resp, err = createToken(req, b, t, roleName, "")
-	// if err != nil || (resp != nil && resp.IsError()) {
-	// 	t.Fatalf("err:%s resp:%#v\n", err, resp)
-	// }
-
-	// if resp.Data["ClientToken"] == "" {
-	// 	t.Fatal("no token returned\n")
-	// }
-
-	// clientToken = resp.Data["ClientToken"].(string)
-	// validateToken(req, b, t, clientToken, roleName, true)
-}
 
 // create the token given the parameters
 func createToken(b logical.Backend, storage logical.Storage, roleName string, ttl time.Duration, claims map[string]interface{}) (*logical.Response, error) {

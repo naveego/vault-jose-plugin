@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SermoDigital/jose/crypto"
-
-	"github.com/SermoDigital/jose/jws"
+	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // TokenCreateEntry is the exposed structure for creating a token
@@ -25,35 +25,41 @@ type TokenCreateEntry struct {
 	KeyName string `json:"key_name" structs:"key_name" mapstructure:"key_name"`
 }
 
+func (t TokenCreateEntry) ToMap() map[string]interface{} {
+	return structs.New(t).Map()
+}
+
 // ValidateJWTToken will return an error if the token is not valid based on the role and the key.
 func ValidateJWTToken(serializedToken string, roleEntry RoleStorageEntry, keyEntry KeyStorageEntry) error {
 
-	token, err := jws.ParseJWT([]byte(serializedToken))
+	token, err := jwt.ParseSigned(serializedToken)
 	if err != nil {
 		return err
 	}
 
-	var key interface{}
-
-	signingType := keyEntry.Algorithm[:2]
-	switch signingType {
-	case "HS":
-		key = []byte(keyEntry.PrivateKey)
-	case "RS":
-		key, err = crypto.ParseRSAPublicKeyFromPEM([]byte(keyEntry.PublicKey))
-		if err != nil {
-			return fmt.Errorf("key %q is invalid", keyEntry.Name)
-		}
-	case "EC":
-		key, err = crypto.ParseECPublicKeyFromPEM([]byte(keyEntry.PublicKey))
-		if err != nil {
-			return fmt.Errorf("key %q is invalid", keyEntry.Name)
-		}
+	var validationKey interface{}
+	switch keyEntry.PrivateKey.Key.(type) {
+	case []byte:
+		validationKey = keyEntry.PrivateKey
+	default:
+		validationKey = keyEntry.PublicKey
 	}
 
-	signingMethod := jws.GetSigningMethod(keyEntry.Algorithm)
+	claims := jwt.Claims{}
+	if err := token.Claims(validationKey, &claims); err != nil {
+		return fmt.Errorf("could not parse signed claims: %s", err)
+	}
 
-	err = token.Validate(key, signingMethod)
+	expected := jwt.Expected{
+		Time:   time.Now().UTC(),
+		Issuer: roleEntry.Issuer,
+	}
+
+	if roleEntry.Audience != "" {
+		expected.Audience = []string{roleEntry.Audience}
+	}
+
+	err = claims.Validate(expected)
 
 	return err
 }
@@ -62,84 +68,56 @@ func ValidateJWTToken(serializedToken string, roleEntry RoleStorageEntry, keyEnt
 func CreateJWTToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, keyEntry KeyStorageEntry) ([]byte, error) {
 
 	var (
-		key interface{}
 		err error
 	)
 
-	if createEntry.TTL == 0 {
-		// no TTL so use the default from the role
-		createEntry.TTL = roleEntry.TokenTTL
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.SignatureAlgorithm(keyEntry.PrivateKey.Algorithm), Key: keyEntry.PrivateKey.Key}, (&jose.SignerOptions{}).WithType("JWT"))
+	if err != nil {
+		return nil, err
 	}
 
-	if createEntry.TTL > roleEntry.MaxTokenTTL {
-		// requested TTL exceeds max, so clip it
-		createEntry.TTL = roleEntry.MaxTokenTTL
-	}
-
-	claims := jws.Claims{}
+	claims := jwt.Claims{}
 
 	id, _ := uuid.NewUUID()
 
-	claims.SetJWTID(id.String())
+	claims.ID = id.String()
 
 	if roleEntry.Audience != "" {
-		claims.SetAudience(roleEntry.Audience)
+		claims.Audience = []string{roleEntry.Audience}
 	}
 	if roleEntry.Issuer != "" {
-		claims.SetIssuer(roleEntry.Issuer)
+		claims.Issuer = roleEntry.Issuer
 	}
 	if roleEntry.Subject != "" {
-		claims.SetSubject(roleEntry.Subject)
+		claims.Subject = roleEntry.Subject
 	}
 	if roleEntry.ExpirationTime {
 		utc := time.Now().UTC().Add(createEntry.TTL)
-		claims.SetExpiration(utc)
+		claims.Expiry = jwt.NewNumericDate(utc)
 	}
 	if roleEntry.NotBefore {
-		claims.SetNotBefore(time.Now().UTC())
+		claims.NotBefore = jwt.NewNumericDate(time.Now())
 	}
 	if roleEntry.IssuedAt {
-		claims.SetIssuedAt(time.Now().UTC())
+		claims.IssuedAt = jwt.NewNumericDate(time.Now())
 	}
 
+	privateClaims := make(map[string]interface{}, len(roleEntry.Claims))
+
 	for claimType, value := range roleEntry.Claims {
-		claims[claimType] = value
+		privateClaims[claimType] = value
 	}
 
 	if len(createEntry.Claims) > 0 {
 		for _, claimType := range roleEntry.AllowedCustomClaims {
 			if value, ok := createEntry.Claims[claimType]; ok {
-				claims.Set(claimType, value)
+				privateClaims[claimType] = value
 			}
 		}
 	}
 
-	signingType := keyEntry.Algorithm[:2]
-	switch signingType {
-	case "HS":
-		key = []byte(keyEntry.PrivateKey)
-	case "RS":
-		key, err = crypto.ParseRSAPrivateKeyFromPEM([]byte(keyEntry.PrivateKey))
-		if err != nil {
-			return nil, fmt.Errorf("key %q is invalid", keyEntry.Name)
-		}
-	case "EC":
-		key, err = crypto.ParseECPrivateKeyFromPEM([]byte(keyEntry.PrivateKey))
-		if err != nil {
-			return nil, fmt.Errorf("key %q is invalid", keyEntry.Name)
-		}
-	}
-
-	signingMethod := jws.GetSigningMethod(keyEntry.Algorithm)
-
-	token := jws.NewJWT(claims, signingMethod)
-
-	serializedToken, err := token.Serialize(key)
-	if err != nil {
-		return nil, fmt.Errorf("signing failed: %s", err)
-	}
-
-	return serializedToken[:], nil
+	raw, err := jwt.Signed(sig).Claims(claims).Claims(privateClaims).CompactSerialize()
+	return []byte(raw), err
 }
 
 func (backend *JwtBackend) createToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, keyEntry KeyStorageEntry) ([]byte, error) {

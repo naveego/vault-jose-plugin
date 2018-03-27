@@ -3,7 +3,9 @@ package josejwt
 import (
 	"context"
 	"fmt"
-	"time"
+
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/json"
 
 	"github.com/google/uuid"
 
@@ -29,12 +31,10 @@ var CreateRoleSchema = map[string]*framework.FieldSchema{
 	"token_ttl": {
 		Type:        framework.TypeDurationSecond,
 		Description: "The default TTL of tokens created through this role, as a golang duration string.",
-		Default:     600,
 	},
 	"max_token_ttl": {
 		Type:        framework.TypeDurationSecond,
 		Description: "The maximum TTL of tokens created through this role, as a golang duration string.",
-		Default:     6000,
 	},
 	"claims": {
 		Type: framework.TypeMap,
@@ -53,6 +53,40 @@ in addition to the standard registered claims configured directly on the role (i
 	"nbf": {Type: framework.TypeBool, Default: true, Description: "Not Before. Automatically added when tokens are issued. To disable, set to false."},
 	"iat": {Type: framework.TypeBool, Default: true, Description: "Issued At. Automatically added when tokens are issued. To disable, set to false."},
 	"exp": {Type: framework.TypeBool, Default: true, Description: "Expiration Time. Automatically added when tokens are issued. To disable, set to false."},
+}
+
+// set up the paths for the roles within vault
+func pathRole(backend *JwtBackend) []*framework.Path {
+	paths := []*framework.Path{
+		&framework.Path{
+			Pattern:      fmt.Sprintf("roles/%s/jwks", framework.GenericNameRegex("name")),
+			HelpSynopsis: "Returns the JWKS for the keys used by this role.",
+			Fields: map[string]*framework.FieldSchema{
+				"name": {
+					Type:        framework.TypeString,
+					Description: "The name of the role to get keys for.",
+				},
+			},
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.ReadOperation: backend.readRoleJWKS,
+			},
+		},
+		&framework.Path{
+			Pattern:      fmt.Sprintf("roles/%s", framework.GenericNameRegex("name")),
+			Fields:       CreateRoleSchema,
+			HelpSynopsis: "CRUD operations on roles. Roles define how tokens can be generated from keys.",
+			HelpDescription: `When a role name is passed to the token/issue endpoint, a token will be created using the 
+claims and TTL settings of that role.`,
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.CreateOperation: backend.createRole,
+				logical.UpdateOperation: backend.createRole,
+				logical.ReadOperation:   backend.readRole,
+				logical.DeleteOperation: backend.removeRole,
+			},
+		},
+	}
+
+	return paths
 }
 
 // remove the specified role from the storage
@@ -94,14 +128,15 @@ func (backend *JwtBackend) readRole(ctx context.Context, req *logical.Request, d
 	return &logical.Response{Data: role.ToMap()}, nil
 }
 func (backend *JwtBackend) readRoleJWKS(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+
 	roleName := data.Get("name").(string)
 	role, err := backend.getRoleEntry(ctx, req.Storage, roleName)
 	if err != nil {
-		return logical.ErrorResponse("Error reading role"), err
+		return logical.ErrorResponse("error reading role"), err
 	}
 
 	if role == nil {
-		return logical.ErrorResponse("role not found"), nil
+		return nil, nil
 	}
 
 	key, err := backend.getKeyEntry(ctx, req.Storage, role.Key)
@@ -109,19 +144,40 @@ func (backend *JwtBackend) readRoleJWKS(ctx context.Context, req *logical.Reques
 		return logical.ErrorResponse("error reading key"), err
 	}
 	if key == nil {
-		return logical.ErrorResponse("key not found"), nil
-	}
-
-	if role == nil {
 		return nil, nil
 	}
 
-	return &logical.Response{Data: role.ToMap()}, nil
+	if key.PublicKey == nil || !key.PublicKey.Valid() {
+		return nil, nil
+	}
+
+	response := &logical.Response{
+		Data: map[string]interface{}{},
+	}
+
+	jwks := jose.JSONWebKeySet{
+		Keys: []jose.JSONWebKey{
+			*key.PublicKey,
+		},
+	}
+
+	jwksBytes, err := json.Marshal(jwks)
+	if err != nil {
+		return logical.ErrorResponse("error creating jwks"), err
+	}
+
+	response.Data[logical.HTTPStatusCode] = 200
+	response.Data[logical.HTTPContentType] = "application/json"
+	response.Data[logical.HTTPRawBody] = jwksBytes
+
+	return response, nil
 }
 
 // create the role within plugin, this will provide the access for applications
 // to be able to create tokens down the line
 func (backend *JwtBackend) createRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+
+	config, _ := getConfig(ctx, req)
 
 	roleName := data.Get("name").(string)
 	if roleName == "" {
@@ -170,17 +226,8 @@ func (backend *JwtBackend) createRole(ctx context.Context, req *logical.Request,
 		}
 	}
 
-	if tokenTTL, ok := data.Get("token_ttl").(int); ok {
-		role.TokenTTL = time.Second * time.Duration(tokenTTL)
-	} else {
-		role.TokenTTL = time.Minute * 10
-	}
-
-	if maxTokenTTL, ok := data.Get("max_token_ttl").(int); ok {
-		role.MaxTokenTTL = time.Second * time.Duration(maxTokenTTL)
-	} else {
-		role.MaxTokenTTL = time.Minute * 10
-	}
+	role.TokenTTL = getDurationOrDefault(data, "token_ttl", config.DefaultTokenTTL)
+	role.MaxTokenTTL = getDurationOrDefault(data, "max_token_ttl", config.DefaultMaxTokenTTL)
 
 	if claims, ok := data.GetOk("claims"); ok {
 		if role.Claims, ok = claims.(map[string]interface{}); !ok {
@@ -224,34 +271,4 @@ func getBoolOrDefault(data *framework.FieldData, key string, d bool) bool {
 		}
 	}
 	return d
-}
-
-// set up the paths for the roles within vault
-func pathRole(backend *JwtBackend) []*framework.Path {
-	paths := []*framework.Path{
-		&framework.Path{
-			Pattern:      fmt.Sprintf("roles/%s", framework.GenericNameRegex("name")),
-			Fields:       CreateRoleSchema,
-			HelpSynopsis: "CRUD operations on roles. Roles define how tokens can be generated from keys.",
-			HelpDescription: `When a role name is passed to the token/issue endpoint, a token will be created using the 
-claims and TTL settings of that role.`,
-			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.CreateOperation: backend.createRole,
-				logical.UpdateOperation: backend.createRole,
-				logical.ReadOperation:   backend.readRole,
-				logical.DeleteOperation: backend.removeRole,
-			},
-		},
-		&framework.Path{
-			Pattern:      fmt.Sprintf("roles/%s/jwks", framework.GenericNameRegex("name")),
-			HelpSynopsis: "Returns the JWKS for the keys used by this role.",
-
-			Callbacks: map[logical.Operation]framework.OperationFunc{
-
-				logical.ReadOperation: backend.readRole,
-			},
-		},
-	}
-
-	return paths
 }

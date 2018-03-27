@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SermoDigital/jose/crypto"
 	"github.com/hashicorp/vault/logical"
-	"github.com/mitchellh/mapstructure"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	. "github.com/naveego/vault-jose-plugin/plugin"
+	jose "gopkg.in/square/go-jose.v2"
+	//. "github.com/naveego/vault-jose-plugin/plugin"
 )
 
 const keyName = "test-key"
@@ -26,13 +24,12 @@ var _ = Describe("PathKeys", func() {
 		b, storage = getTestBackend()
 	})
 
-	Describe("PUT+GET keys/:name", func() {
+	Describe("create/read keys/:name", func() {
 
-		It("should round trip keys without private key", func() {
+		It("should round trip symmetric key", func() {
 			entry := map[string]interface{}{
-				"name":        keyName,
-				"alg":         crypto.SigningMethodHS256.Name,
-				"private_key": "test-key",
+				"name": keyName,
+				"jwk":  jose.JSONWebKey{Key: []byte("test-key"), Algorithm: string(jose.HS256)},
 			}
 			Expect(createKey(b, storage, entry)).NotTo(HaveLogicalError())
 
@@ -45,18 +42,60 @@ var _ = Describe("PathKeys", func() {
 			resp, err := b.HandleRequest(context.Background(), req)
 			Expect(resp, err).ToNot(HaveLogicalError())
 
-			var returnedKey KeyStorageEntry
-			err = mapstructure.Decode(resp.Data, &returnedKey)
-
-			Expect(resp.Data).To(BeEquivalentTo(map[string]interface{}{
-				"name":       keyName,
-				"alg":        crypto.SigningMethodHS256.Name,
-				"enc":        "",
-				"public_key": "",
-			}))
-
+			Expect(resp.Data).To(HaveKeyWithValue("public_key", BeNil()))
 		})
 
+		It("should round trip asymmetric key", func() {
+			entry := map[string]interface{}{
+				"name": keyName,
+				"alg":  "RS256",
+				"use":  "sig",
+			}
+
+			Expect(createKey(b, storage, entry)).NotTo(HaveLogicalError())
+
+			req := &logical.Request{
+				Storage:   storage,
+				Operation: logical.ReadOperation,
+				Path:      fmt.Sprintf("keys/%s", keyName),
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			Expect(resp, err).ToNot(HaveLogicalError())
+
+			Expect(resp.Data).To(HaveKeyWithValue("public_key", Not(BeNil())))
+		})
+	})
+
+	Describe("create/delete/read keys/:name", func() {
+
+		It("should round trip asymmetric key", func() {
+			entry := map[string]interface{}{
+				"name": keyName,
+				"alg":  "RS256",
+				"use":  "sig",
+			}
+
+			Expect(createKey(b, storage, entry)).NotTo(HaveLogicalError())
+
+			req := &logical.Request{
+				Storage:   storage,
+				Operation: logical.DeleteOperation,
+				Path:      fmt.Sprintf("keys/%s", keyName),
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			Expect(resp, err).ToNot(HaveLogicalError())
+			Expect(resp.Data).To(HaveKeyWithValue("result", ContainSubstring("deleted")))
+
+			resp, err = b.HandleRequest(context.Background(), &logical.Request{
+				Storage:   storage,
+				Operation: logical.ReadOperation,
+				Path:      fmt.Sprintf("keys/%s", keyName),
+			})
+
+			Expect(resp, err).To(BeNil())
+		})
 	})
 
 })

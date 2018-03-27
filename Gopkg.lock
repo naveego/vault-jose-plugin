@@ -183,6 +183,12 @@
 
 [[projects]]
   branch = "master"
+  name = "golang.org/x/crypto"
+  packages = ["ed25519","ed25519/internal/edwards25519"]
+  revision = "88942b9c40a4c9d203b82b3731787b672d6e809b"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/net"
   packages = ["context","html","html/atom","html/charset","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
   revision = "6078986fec03a1dcc236c34816c71b0e05018fda"
@@ -212,6 +218,12 @@
   version = "v1.10.0"
 
 [[projects]]
+  name = "gopkg.in/square/go-jose.v2"
+  packages = [".","cipher","json"]
+  revision = "552e98edab5d620205ff1a8960bf52a5a10aad03"
+  version = "v2.1.5"
+
+[[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "86f5ed62f8a0ee96bd888d2efdfd6d4fb100a4eb"
@@ -220,6 +232,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3b8f974f3aba4ca16fb107c7531f17e0758b11b87c2f3844e1fff9d4905a957a"
+  inputs-digest = "13738dd28695feb530045ae4eaea50b4ef267acd6e09271fbe0da739be187240"
   solver-name = "gps-cdcl"
   solver-version = 1
