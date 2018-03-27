@@ -112,6 +112,16 @@ func (k *KeySetStorageEntry) SetActiveKID(kid string) error {
 	return nil
 }
 
+func (k *KeySetStorageEntry) GetActiveKey() (jose.JSONWebKey, error) {
+
+	key, ok := k.Keys[k.ActiveKID]
+	if !ok {
+		return key, errors.New("no key with provided `kid` was found")
+	}
+
+	return key, nil
+}
+
 func (backend *JwtBackend) getKeySetEntry(ctx context.Context, storage logical.Storage, keyName string) (*KeySetStorageEntry, error) {
 	if keyName == "" {
 		return nil, fmt.Errorf("missing key name")

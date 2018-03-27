@@ -20,8 +20,8 @@ type RoleStorageEntry struct {
 	// The type of token to be created for the role, jwe|jwt|jws.
 	Type string `json:"type" structs:"type" mapstructure:"type"`
 
-	// The name of the key this role will use to sign/encrypt tokens.
-	Key string `json:"key" structs:"key" mapstructure:"key"`
+	// The name of the key set this role will use to sign/encrypt tokens.
+	KeySet string `json:"key_set" structs:"key_set" mapstructure:"key_set"`
 
 	// The default TTL (in seconds) for tokens created through this role.
 	TokenTTL time.Duration `json:"token_ttl" structs:"token_ttl" mapstructure:"token_ttl"`

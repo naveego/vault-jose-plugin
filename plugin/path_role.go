@@ -21,13 +21,9 @@ var CreateRoleSchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "The type of token returned (jwe|jwt|jws).",
 	},
-	"key": {
+	"key_set": {
 		Type:        framework.TypeString,
-		Description: "The name of the key to use for signing/encryption.",
-	},
-	"other_keys": {
-		Type:        framework.TypeString,
-		Description: "The name of keys which should be part of the JKWS for this role of the key to use for signing/encryption.",
+		Description: "The name of the key set to use for signing/encryption.",
 	},
 	"token_ttl": {
 		Type:        framework.TypeDurationSecond,
@@ -162,13 +158,11 @@ func (backend *JwtBackend) createRole(ctx context.Context, req *logical.Request,
 		}
 	}
 
-	if key, ok := data.GetOk("key"); !ok {
-		return logical.ErrorResponse("key is required"), nil
-	} else {
-		if role.Key, ok = key.(string); !ok {
-			return logical.ErrorResponse("key must be a string"), nil
-		}
+	keySet, ok := data.GetOk("key_set")
+	if !ok {
+		return logical.ErrorResponse("key_set is required"), nil
 	}
+	role.KeySet = keySet.(string)
 
 	role.TokenTTL = getDurationOrDefault(data, "token_ttl", config.Lease)
 	role.MaxTokenTTL = getDurationOrDefault(data, "max_token_ttl", config.LeaseMax)

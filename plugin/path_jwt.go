@@ -80,9 +80,9 @@ func (backend *JwtBackend) pathJwtIssue(ctx context.Context, req *logical.Reques
 		return logical.ErrorResponse(err.Error()), err
 	}
 
-	keyEntry, err := backend.getKeyEntry(ctx, req.Storage, roleEntry.Key)
-	if keyEntry == nil || err != nil {
-		err = fmt.Errorf(fmt.Sprintf("key %q for role %q not recognized", roleEntry.Key, tokenEntry.Role))
+	keySetEntry, err := backend.getKeySetEntry(ctx, req.Storage, roleEntry.KeySet)
+	if keySetEntry == nil || err != nil {
+		err = fmt.Errorf(fmt.Sprintf("key set %q for role name %q not recognized", roleEntry.KeySet, tokenEntry.Role))
 		return logical.ErrorResponse(err.Error()), err
 	}
 
@@ -96,7 +96,12 @@ func (backend *JwtBackend) pathJwtIssue(ctx context.Context, req *logical.Reques
 		tokenEntry.TTL = roleEntry.MaxTokenTTL
 	}
 
-	token, err := backend.createToken(tokenEntry, *roleEntry, *keyEntry)
+	activeKey, err := keySetEntry.GetActiveKey()
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+
+	token, err := backend.createToken(tokenEntry, *roleEntry, activeKey)
 
 	if err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Error creating token, %#v", err)), err
@@ -130,9 +135,9 @@ func (backend *JwtBackend) pathJwtValidate(ctx context.Context, req *logical.Req
 		return logical.ErrorResponse(err.Error()), err
 	}
 
-	keyEntry, err := backend.getKeyEntry(ctx, req.Storage, roleEntry.Key)
-	if keyEntry == nil || err != nil {
-		err = fmt.Errorf(fmt.Sprintf("Key name %q for role name %q not recognized", roleEntry.Key, roleName))
+	keySetEntry, err := backend.getKeySetEntry(ctx, req.Storage, roleEntry.KeySet)
+	if keySetEntry == nil || err != nil {
+		err = fmt.Errorf(fmt.Sprintf("key set %q for role name %q not recognized", roleEntry.KeySet, roleName))
 		return logical.ErrorResponse(err.Error()), err
 	}
 
@@ -143,10 +148,10 @@ func (backend *JwtBackend) pathJwtValidate(ctx context.Context, req *logical.Req
 
 	if token == "" {
 		err = errors.New("token was missing")
-		return logical.ErrorResponse(err.Error()), err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 
-	err = ValidateJWTToken(token, *roleEntry, *keyEntry)
+	err = ValidateJWTToken(token, *roleEntry, keySetEntry)
 
 	if err == nil {
 		return &logical.Response{Data: map[string]interface{}{

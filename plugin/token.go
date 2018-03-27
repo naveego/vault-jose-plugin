@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,11 +29,28 @@ func (t TokenCreateEntry) ToMap() map[string]interface{} {
 }
 
 // ValidateJWTToken will return an error if the token is not valid based on the role and the key.
-func ValidateJWTToken(serializedToken string, roleEntry RoleStorageEntry, key jose.JSONWebKey) error {
+func ValidateJWTToken(serializedToken string, roleEntry RoleStorageEntry, keySet *KeySetStorageEntry) error {
 
 	token, err := jwt.ParseSigned(serializedToken)
 	if err != nil {
 		return err
+	}
+
+	var kid string
+	for _, header := range token.Headers {
+		if header.KeyID != "" {
+			kid = header.KeyID
+			break
+		}
+	}
+
+	if kid == "" {
+		return errors.New("no `kid` header found")
+	}
+
+	key, ok := keySet.Keys[kid]
+	if !ok {
+		return errors.New("`kid` header did not match available keys")
 	}
 
 	var validationKey interface{}
@@ -63,13 +81,13 @@ func ValidateJWTToken(serializedToken string, roleEntry RoleStorageEntry, key jo
 }
 
 // CreateJWTToken will create a token using the parameters in the token entry, the defaults in the role entry, and signed using the key.
-func CreateJWTToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, keyEntry KeyStorageEntry) ([]byte, error) {
+func CreateJWTToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, key jose.JSONWebKey) ([]byte, error) {
 
 	var (
 		err error
 	)
 
-	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.SignatureAlgorithm(keyEntry.PrivateKey.Algorithm), Key: keyEntry.PrivateKey.Key}, (&jose.SignerOptions{}).WithType("JWT"))
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.SignatureAlgorithm(key.Algorithm), Key: key.Key}, (&jose.SignerOptions{}).WithType("JWT"))
 	if err != nil {
 		return nil, err
 	}
@@ -118,13 +136,13 @@ func CreateJWTToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, ke
 	return []byte(raw), err
 }
 
-func (backend *JwtBackend) createToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, keyEntry KeyStorageEntry) ([]byte, error) {
+func (backend *JwtBackend) createToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, key jose.JSONWebKey) ([]byte, error) {
 
 	switch roleEntry.Type {
 	case "jws":
 		return nil, nil
 	case "jwt":
-		return CreateJWTToken(createEntry, roleEntry, keyEntry)
+		return CreateJWTToken(createEntry, roleEntry, key)
 	default:
 		// throw an error
 		return nil, fmt.Errorf("unsupported token type %s", roleEntry.Type)

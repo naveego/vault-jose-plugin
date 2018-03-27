@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/json"
-
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
@@ -44,36 +41,22 @@ func (backend *JwtBackend) readRoleJWKS(ctx context.Context, req *logical.Reques
 		return nil, nil
 	}
 
-	key, err := backend.getKeyEntry(ctx, req.Storage, role.Key)
-	if err != nil {
-		return logical.ErrorResponse("error reading key"), err
-	}
-	if key == nil {
-		return nil, nil
+	keySetEntry, err := backend.getKeySetEntry(ctx, req.Storage, role.KeySet)
+	if keySetEntry == nil || err != nil {
+		err = fmt.Errorf(fmt.Sprintf("key set %q for role name %q not recognized", role.KeySet, roleName))
+		return logical.ErrorResponse(err.Error()), err
 	}
 
-	if key.PublicKey == nil || !key.PublicKey.Valid() {
-		return nil, nil
+	var keys []interface{}
+
+	for kid := range keySetEntry.Keys {
+		key := keySetEntry.GetPublicKey(kid)
+		if key != nil {
+			keys = append(keys, key)
+		}
 	}
 
-	response := &logical.Response{
-		Data: map[string]interface{}{},
-	}
-
-	jwks := jose.JSONWebKeySet{
-		Keys: []jose.JSONWebKey{
-			*key.PublicKey,
-		},
-	}
-
-	jwksBytes, err := json.Marshal(jwks)
-	if err != nil {
-		return nil, fmt.Errorf("error creating jwks JSON: %s", err)
-	}
-
-	if err := json.Unmarshal(jwksBytes, &response.Data); err != nil {
-		return nil, fmt.Errorf("error creating jwks data: %s", err)
-	}
-
-	return response, nil
+	return &logical.Response{Data: map[string]interface{}{
+		"keys": keys,
+	}}, nil
 }

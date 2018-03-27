@@ -34,9 +34,9 @@ var _ = Describe("PathJWKS", func() {
 			})).NotTo(HaveLogicalError())
 
 			Expect(createRole(b, storage, RoleStorageEntry{
-				Name: roleName,
-				Type: "jwt",
-				Key:  "test-key",
+				Name:   roleName,
+				Type:   "jwt",
+				KeySet: "test-key",
 			}.ToMap())).ToNot(HaveLogicalError())
 
 			result, err := b.HandleRequest(context.Background(), &logical.Request{
