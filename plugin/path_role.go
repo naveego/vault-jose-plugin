@@ -25,6 +25,10 @@ var CreateRoleSchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "The name of the key to use for signing/encryption.",
 	},
+	"other_keys": {
+		Type:        framework.TypeString,
+		Description: "The name of keys which should be part of the JKWS for this role of the key to use for signing/encryption.",
+	},
 	"token_ttl": {
 		Type:        framework.TypeDurationSecond,
 		Description: "The default TTL of tokens created through this role, as a golang duration string.",
@@ -60,7 +64,7 @@ func pathRole(backend *JwtBackend) []*framework.Path {
 			Pattern:      fmt.Sprintf("roles/%s", framework.GenericNameRegex("name")),
 			Fields:       CreateRoleSchema,
 			HelpSynopsis: "CRUD operations on roles. Roles define how tokens can be generated from keys.",
-			HelpDescription: `When a role name is passed to the token/issue endpoint, a token will be created using the 
+			HelpDescription: `When a role name is passed to the jwt/issue endpoint, a token will be created using the 
 claims and TTL settings of that role.`,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.createRole,
@@ -166,8 +170,8 @@ func (backend *JwtBackend) createRole(ctx context.Context, req *logical.Request,
 		}
 	}
 
-	role.TokenTTL = getDurationOrDefault(data, "token_ttl", config.DefaultTokenTTL)
-	role.MaxTokenTTL = getDurationOrDefault(data, "max_token_ttl", config.DefaultMaxTokenTTL)
+	role.TokenTTL = getDurationOrDefault(data, "token_ttl", config.Lease)
+	role.MaxTokenTTL = getDurationOrDefault(data, "max_token_ttl", config.LeaseMax)
 
 	if claims, ok := data.GetOk("claims"); ok {
 		if role.Claims, ok = claims.(map[string]interface{}); !ok {

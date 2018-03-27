@@ -37,7 +37,7 @@ func Backend(ctx context.Context, conf *logical.BackendConfig) *JwtBackend {
 		//		AuthRenew:   backend.pathAuthRenew,
 		PathsSpecial: &logical.Paths{
 			Unauthenticated: []string{
-				"token/validate",
+				"jwt/validate/*",
 				"jwks/*",
 			},
 			SealWrapStorage: []string{
@@ -48,11 +48,12 @@ func Backend(ctx context.Context, conf *logical.BackendConfig) *JwtBackend {
 			secretJWT(backend),
 		},
 		Paths: framework.PathAppend(
-			pathToken(backend),
+			pathJWT(backend),
 			pathKeys(backend),
 			pathJWKS(backend),
 			pathRole(backend),
-			pathConfig(backend),
+			pathConfigLease(backend),
+			pathConfigURLs(backend),
 		),
 	}
 

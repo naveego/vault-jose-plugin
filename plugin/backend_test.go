@@ -117,7 +117,7 @@ func testAccReadJWKS(roleName string) logicaltest.TestStep {
 func testAccCreateJWT(roleName string, token *string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.CreateOperation,
-		Path:      path.Join("token/issue", roleName),
+		Path:      path.Join("jwt/issue", roleName),
 		Data: map[string]interface{}{
 			"name": roleName,
 			"iss":  "http://127.0.0.1:8200/",

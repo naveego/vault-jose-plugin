@@ -67,7 +67,7 @@ var _ = Describe("PathIssue", func() {
 
 	})
 
-	Describe("token/issue/:role", func() {
+	Describe("jwt/issue/:role", func() {
 
 		It("should issue token", func() {
 
@@ -111,7 +111,7 @@ var _ = Describe("PathIssue", func() {
 					"token": token,
 					"role":  roleName,
 				},
-				Path:      fmt.Sprintf("token/validate/%s", roleName),
+				Path:      fmt.Sprintf("jwt/validate/%s", roleName),
 				Operation: logical.UpdateOperation,
 			}
 
@@ -137,7 +137,7 @@ var _ = Describe("PathIssue", func() {
 					"token": token,
 					"role":  roleName,
 				},
-				Path:      fmt.Sprintf("token/validate/%s", roleName),
+				Path:      fmt.Sprintf("jwt/validate/%s", roleName),
 				Operation: logical.UpdateOperation,
 			}
 
@@ -165,7 +165,7 @@ func createToken(b logical.Backend, storage logical.Storage, roleName string, tt
 	req := &logical.Request{
 		Storage:   storage,
 		Operation: logical.UpdateOperation,
-		Path:      fmt.Sprintf("token/issue/%s", roleName),
+		Path:      fmt.Sprintf("jwt/issue/%s", roleName),
 		Data:      data,
 	}
 	resp, err := b.HandleRequest(context.Background(), req)

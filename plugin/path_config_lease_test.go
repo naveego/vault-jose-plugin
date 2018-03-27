@@ -23,14 +23,14 @@ var _ = Describe("PathConfig", func() {
 
 		It("should round trip config", func() {
 			entry := map[string]interface{}{
-				"default_token_ttl":     float64(7),
-				"default_max_token_ttl": float64(70),
+				"lease":     float64(7),
+				"lease_max": float64(70),
 			}
 
 			resp, err := b.HandleRequest(context.Background(), &logical.Request{
 				Storage:   storage,
 				Operation: logical.UpdateOperation,
-				Path:      "config",
+				Path:      "config/lease",
 				Data:      entry,
 			})
 			Expect(resp, err).ToNot(HaveLogicalError())
@@ -39,7 +39,7 @@ var _ = Describe("PathConfig", func() {
 			resp, err = b.HandleRequest(context.Background(), &logical.Request{
 				Storage:   storage,
 				Operation: logical.ReadOperation,
-				Path:      "config",
+				Path:      "config/lease",
 			})
 			Expect(resp, err).ToNot(HaveLogicalError())
 			Expect(resp.Data).To(BeEquivalentTo(entry))
