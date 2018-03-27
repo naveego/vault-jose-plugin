@@ -1,4 +1,4 @@
-package josejwt
+package josejwt_test
 
 import (
 	"context"
@@ -15,13 +15,14 @@ import (
 	// hold on to reference so dep doesn't lose it
 	_ "github.com/SAP/go-hdb/driver"
 
+	"github.com/naveego/vault-jose-plugin/plugin"
 	. "github.com/onsi/ginkgo"
 )
 
 func testingFactory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
 	config := logical.TestBackendConfig()
 	config.StorageView = &logical.InmemStorage{}
-	b, err := Factory(context.Background(), config)
+	b, err := josejwt.Factory(context.Background(), config)
 	return b, err
 }
 
@@ -54,7 +55,7 @@ var _ = Describe("BackendTests", func() {
 			Steps: []logicaltest.TestStep{
 				testAccCreateGeneratedRSAKey(keyName),
 				testAccCreateRole(roleName, keyName),
-				testAccReadJWKS(roleName),
+				testAccReadJWKSForRole(roleName),
 			},
 		})
 	})
@@ -88,7 +89,7 @@ func testAccCreateRole(roleName, keyName string) logicaltest.TestStep {
 	}
 }
 
-func testAccReadJWKS(roleName string) logicaltest.TestStep {
+func testAccReadJWKSForRole(roleName string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation:       logical.ReadOperation,
 		Unauthenticated: true,

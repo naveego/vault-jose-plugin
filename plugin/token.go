@@ -28,7 +28,7 @@ func (t TokenCreateEntry) ToMap() map[string]interface{} {
 }
 
 // ValidateJWTToken will return an error if the token is not valid based on the role and the key.
-func ValidateJWTToken(serializedToken string, roleEntry RoleStorageEntry, keyEntry KeyStorageEntry) error {
+func ValidateJWTToken(serializedToken string, roleEntry RoleStorageEntry, key jose.JSONWebKey) error {
 
 	token, err := jwt.ParseSigned(serializedToken)
 	if err != nil {
@@ -36,11 +36,11 @@ func ValidateJWTToken(serializedToken string, roleEntry RoleStorageEntry, keyEnt
 	}
 
 	var validationKey interface{}
-	switch keyEntry.PrivateKey.Key.(type) {
+	switch key.Key.(type) {
 	case []byte:
-		validationKey = keyEntry.PrivateKey
+		validationKey = key
 	default:
-		validationKey = keyEntry.PublicKey
+		validationKey = key.Public()
 	}
 
 	claims := jwt.Claims{}

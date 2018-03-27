@@ -18,7 +18,7 @@ var _ = Describe("ValidateJWTToken", func() {
 
 	Describe("based on signature", func() {
 
-		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k KeyStorageEntry) string {
+		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k jose.JSONWebKey) string {
 			actualBytes, err := CreateJWTToken(t, r, k)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -46,7 +46,7 @@ var _ = Describe("ValidateJWTToken", func() {
 				Role: role.Name,
 			}, role, key)
 
-			Expect(ValidateJWTToken(actual, role, key)).To(Succeed())
+			Expect(ValidateJWTToken(actual, role, *key.PrivateKey)).To(Succeed())
 		})
 
 		It("should support rs*", func() {
@@ -69,7 +69,7 @@ var _ = Describe("ValidateJWTToken", func() {
 				Role: role.Name,
 			}, role, key)
 
-			Expect(ValidateJWTToken(actual, role, key)).To(Succeed())
+			Expect(ValidateJWTToken(actual, role, *key.PrivateKey)).To(Succeed())
 		})
 	})
 
@@ -79,16 +79,16 @@ var _ = Describe("CreateJWTToken", func() {
 
 	Describe("signing", func() {
 
-		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k KeyStorageEntry) (claims jwt.Claims, privateClaims map[string]interface{}) {
+		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k jose.JSONWebKey) (claims jwt.Claims, privateClaims map[string]interface{}) {
 			actualBytes, err := CreateJWTToken(t, r, k)
 			Expect(err).ToNot(HaveOccurred())
 
 			actual, err := jwt.ParseSigned(string(actualBytes))
 			Expect(err).ToNot(HaveOccurred())
 			if k.PrivateKey.Algorithm == string(jose.HS256) {
-				Expect(actual.Claims(k.PrivateKey, &claims, &privateClaims)).To(Succeed())
+				Expect(actual.Claims(k, &claims, &privateClaims)).To(Succeed())
 			} else {
-				Expect(actual.Claims(k.PublicKey, &claims, &privateClaims)).To(Succeed())
+				Expect(actual.Claims(k.Public(), &claims, &privateClaims)).To(Succeed())
 			}
 
 			return
@@ -113,7 +113,7 @@ var _ = Describe("CreateJWTToken", func() {
 
 			claims, privateClaims := getJWT(TokenCreateEntry{
 				Role: role.Name,
-			}, role, key)
+			}, role, *key.PrivateKey)
 			Expect(claims).ToNot(BeNil())
 			Expect(privateClaims).ToNot(BeNil())
 
@@ -137,40 +137,11 @@ var _ = Describe("CreateJWTToken", func() {
 
 			claims, privateClaims := getJWT(TokenCreateEntry{
 				Role: role.Name,
-			}, role, key)
+			}, role, *key.PrivateKey)
 			Expect(claims).ToNot(BeNil())
 			Expect(privateClaims).ToNot(BeNil())
 		})
 
-		// DescribeTable("elliptic curve", func(method string) {
-
-		// 	key := KeyStorageEntry{
-		// 		Name:      "test-key",
-		// 		Algorithm: method,
-		// 	}
-
-		// 	Expect(GeneratePublicAndPrivateKeys(&key)).To(Succeed())
-
-		// 	role := RoleStorageEntry{
-		// 		Name:     "test-role",
-		// 		Type:     "jwt",
-		// 		Key:      key.Name,
-		// 		TokenTTL: 100,
-		// 	}
-
-		// 	actual := getJWT(TokenCreateEntry{
-		// 		Role: role.Name,
-		// 	}, role, key)
-
-		// 	signingMethod := jws.GetSigningMethod(key.Algorithm)
-		// 	publicKey, err := crypto.ParseRSAPublicKeyFromPEM([]byte(key.PublicKey))
-		// 	Expect(err).ToNot(HaveOccurred())
-		// 	Expect(actual.Validate(publicKey, signingMethod)).To(Succeed())
-		// },
-		// 	Entry("EC256", crypto.SigningMethodES256.Name),
-		// 	Entry("EC384", crypto.SigningMethodES384.Name),
-		// 	Entry("EC512", crypto.SigningMethodES512.Name),
-		// )
 	})
 
 	Describe("setting claims", func() {
@@ -179,7 +150,7 @@ var _ = Describe("CreateJWTToken", func() {
 			role RoleStorageEntry
 		)
 
-		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k KeyStorageEntry) (claims jwt.Claims, privateClaims map[string]interface{}) {
+		getJWT := func(t TokenCreateEntry, r RoleStorageEntry, k jose.JSONWebKey) (claims jwt.Claims, privateClaims map[string]interface{}) {
 			actualBytes, err := CreateJWTToken(t, r, k)
 			Expect(err).ToNot(HaveOccurred())
 
