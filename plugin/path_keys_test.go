@@ -26,6 +26,26 @@ var _ = Describe("PathKeys", func() {
 
 	Describe("create/read keys/:name", func() {
 
+		It("should generate symmetric key", func() {
+			entry := map[string]interface{}{
+				"name": keyName,
+				"use":  "sig",
+				"alg":  string(jose.HS256),
+			}
+			Expect(createKey(b, storage, entry)).NotTo(HaveLogicalError())
+
+			req := &logical.Request{
+				Storage:   storage,
+				Operation: logical.ReadOperation,
+				Path:      fmt.Sprintf("keys/%s", keyName),
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			Expect(resp, err).ToNot(HaveLogicalError())
+
+			Expect(resp.Data).To(HaveKeyWithValue("public_key", BeNil()))
+		})
+
 		It("should round trip symmetric key", func() {
 			entry := map[string]interface{}{
 				"name": keyName,

@@ -146,6 +146,13 @@ To generate a key, include the properties 'alg' and 'use', and do not provide a 
 
 To use an existing key, set the property 'jwk' to a string containing the JWK form of the key.
 			`,
+			ExistenceCheck: func(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
+				keyName := data.Get("name").(string)
+
+				key, err := backend.getKeyEntry(ctx, req.Storage, keyName)
+
+				return key != nil, err
+			},
 
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.createKey,

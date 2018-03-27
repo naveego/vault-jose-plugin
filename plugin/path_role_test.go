@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/json"
-
 	"github.com/hashicorp/vault/logical"
 	. "github.com/naveego/vault-jose-plugin/plugin"
 	. "github.com/onsi/ginkgo"
@@ -133,41 +130,6 @@ var _ = Describe("PathRole", func() {
 			result, err := b.HandleRequest(context.Background(), getReq)
 			Expect(result, err).ToNot(HaveLogicalError())
 			Expect(result).To(BeNil())
-
-		})
-
-	})
-
-	Describe("read roles/:name/jwks", func() {
-
-		It("should return jwks", func() {
-
-			Expect(createKey(b, storage, map[string]interface{}{
-				"name": keyName,
-				"alg":  "RS256",
-				"use":  "sig",
-			})).NotTo(HaveLogicalError())
-
-			Expect(createRole(b, storage, RoleStorageEntry{
-				Name: roleName,
-				Type: "jwt",
-				Key:  "test-key",
-			}.ToMap())).ToNot(HaveLogicalError())
-
-			result, err := b.HandleRequest(context.Background(), &logical.Request{
-				Operation: logical.ReadOperation,
-				Path:      fmt.Sprintf("roles/%s/jwks", roleName),
-				Storage:   storage,
-			})
-			Expect(result, err).ToNot(HaveLogicalError())
-			Expect(result.Data).To(And(
-				HaveKeyWithValue(logical.HTTPContentType, "application/json"),
-				HaveKeyWithValue(logical.HTTPStatusCode, 200),
-				HaveKey(logical.HTTPRawBody),
-			))
-
-			var keySet jose.JSONWebKeySet
-			Expect(json.Unmarshal(result.Data[logical.HTTPRawBody].([]byte), &keySet)).To(Succeed())
 
 		})
 

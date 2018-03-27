@@ -31,6 +31,7 @@ ENV VAULT_CLUSTER_ADDR ""
 ENV VAULT_API_ADDR ""
 #ENV VAULT_LOCAL_CONFIG '{ "plugin_directory": "/vault/plugins", "storage": { "file": { "path": "/vault/file" } } }'
 ENV VAULT_DEV_ROOT_TOKEN_ID "root"
+ENV VAULT_LOG_LEVEL "trace"
 
 RUN apk --no-cache add ca-certificates
 RUN mkdir -p /vault/plugins

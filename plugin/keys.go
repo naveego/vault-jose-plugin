@@ -148,6 +148,13 @@ func GeneratePublicAndPrivateKeys(key *KeyStorageEntry, alg, use string) error {
 
 	key.ID = uuid.New().String()
 
+	if alg[:2] == "HS" {
+		b := make([]byte, 256)
+		_, err := rand.Read(b)
+		key.PrivateKey = &jose.JSONWebKey{Key: b, KeyID: key.ID, Algorithm: alg, Use: use}
+		return err
+	}
+
 	var privKey crypto.PublicKey
 	var pubKey crypto.PrivateKey
 	var err error
@@ -170,15 +177,6 @@ func GeneratePublicAndPrivateKeys(key *KeyStorageEntry, alg, use string) error {
 	}
 
 	return nil
-}
-
-func generateSymmetricKey() (string, error) {
-
-	b := make([]byte, 256)
-	_, err := rand.Read(b)
-
-	return string(b), err
-
 }
 
 // KeygenSig generates keypair for corresponding SignatureAlgorithm.

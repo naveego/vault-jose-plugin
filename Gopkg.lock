@@ -2,10 +2,28 @@
 
 
 [[projects]]
+  name = "github.com/Jeffail/gabs"
+  packages = ["."]
+  revision = "2a3aa15961d5fee6047b8151b67ac2f08ba2c48c"
+  version = "1.0"
+
+[[projects]]
+  name = "github.com/SAP/go-hdb"
+  packages = ["driver","driver/sqltrace","internal/bufio","internal/protocol","internal/unicode","internal/unicode/cesu8"]
+  revision = "c80549df883e955dff808b1258c26f32b3ed10a4"
+  version = "v0.9.5"
+
+[[projects]]
   name = "github.com/SermoDigital/jose"
   packages = [".","crypto","jws","jwt"]
   revision = "f6df55f235c24f236d11dbcf665249a59ac2021f"
   version = "1.1"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/armon/go-metrics"
+  packages = ["."]
+  revision = "783273d703149aaeb9897cf58613d5af48861c25"
 
 [[projects]]
   branch = "master"
@@ -14,9 +32,33 @@
   revision = "1fca145dffbcaa8fe914309b1ec0cfc67500fe61"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/denisenkom/go-mssqldb"
+  packages = [".","internal/cp"]
+  revision = "270bc3860bb94dd3a3ffd047377d746c5e276726"
+
+[[projects]]
   name = "github.com/fatih/structs"
   packages = ["."]
   revision = "a720dfa8df582c51dee1b36feabb906bde1588bd"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/go-sql-driver/mysql"
+  packages = ["."]
+  revision = "a0583e0143b1624142adab07e0e97fe106d99561"
+  version = "v1.3"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/gocql/gocql"
+  packages = [".","internal/lru","internal/murmur","internal/streams"]
+  revision = "12e3a8c05db483441932e84ab6c35c339fb01de7"
+
+[[projects]]
+  name = "github.com/gogo/protobuf"
+  packages = ["proto"]
+  revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
   version = "v1.0.0"
 
 [[projects]]
@@ -39,6 +81,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/hailocab/go-hostpool"
+  packages = ["."]
+  revision = "e80d13ce29ede4452c43dea11e79b9bc8a15b478"
+
+[[projects]]
+  branch = "master"
   name = "github.com/hashicorp/errwrap"
   packages = ["."]
   revision = "7554cd9344cec97297fa6649b055a8c98c2a1e55"
@@ -54,6 +102,18 @@
   name = "github.com/hashicorp/go-hclog"
   packages = ["."]
   revision = "5bcb0f17e36442247290887cc914a6e507afa5c4"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/go-immutable-radix"
+  packages = ["."]
+  revision = "7f3cd4390caab3250a57f30efdb2a65dd7649ecf"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/go-memdb"
+  packages = ["."]
+  revision = "1289e7fffe71d8fd4d4d491ba9a412c50f244c44"
 
 [[projects]]
   branch = "master"
@@ -99,7 +159,7 @@
 
 [[projects]]
   name = "github.com/hashicorp/vault"
-  packages = ["api","helper/certutil","helper/compressutil","helper/consts","helper/errutil","helper/jsonutil","helper/locksutil","helper/logbridge","helper/logformat","helper/mlock","helper/parseutil","helper/pluginutil","helper/salt","helper/strutil","helper/wrapping","logical","logical/framework","logical/plugin","logical/plugin/pb","physical","physical/inmem","version"]
+  packages = ["api","audit","builtin/logical/database/dbplugin","helper/builtinplugins","helper/certutil","helper/compressutil","helper/consts","helper/errutil","helper/forwarding","helper/identity","helper/jsonutil","helper/locksutil","helper/logbridge","helper/logformat","helper/mlock","helper/parseutil","helper/pgpkeys","helper/pluginutil","helper/policyutil","helper/reload","helper/salt","helper/storagepacker","helper/strutil","helper/tlsutil","helper/wrapping","helper/xor","http","logical","logical/framework","logical/plugin","logical/plugin/pb","logical/testing","physical","physical/inmem","plugins","plugins/database/cassandra","plugins/database/hana","plugins/database/mongodb","plugins/database/mssql","plugins/database/mysql","plugins/database/postgresql","plugins/helper/database/connutil","plugins/helper/database/credsutil","plugins/helper/database/dbutil","shamir","vault","version"]
   revision = "7e1fbde40afee241f81ef08700e7987d86fc7242"
   version = "v0.9.6"
 
@@ -108,6 +168,24 @@
   name = "github.com/hashicorp/yamux"
   packages = ["."]
   revision = "2658be15c5f05e76244154714161f17e3e77de2e"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/jefferai/jsonx"
+  packages = ["."]
+  revision = "9cc31c3135eef39b8e72585f37efa92b6ca314d0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/keybase/go-crypto"
+  packages = ["brainpool","cast5","curve25519","ed25519","ed25519/internal/edwards25519","openpgp","openpgp/armor","openpgp/ecdh","openpgp/elgamal","openpgp/errors","openpgp/packet","openpgp/s2k","rsa"]
+  revision = "c86609b27f9eaa80962974009eb5472d58bb4043"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/lib/pq"
+  packages = [".","oid"]
+  revision = "d34b9ff171c21ad295489235aec8b6626023cd04"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -135,6 +213,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/mitchellh/copystructure"
+  packages = ["."]
+  revision = "d23ffcb85de31694d6ccaa23ccb4a03e55c1303f"
+
+[[projects]]
+  branch = "master"
   name = "github.com/mitchellh/go-homedir"
   packages = ["."]
   revision = "b8bc1bf767474819792c23f32d8286a45736f1c6"
@@ -150,6 +234,12 @@
   name = "github.com/mitchellh/mapstructure"
   packages = ["."]
   revision = "00c29f56e2386353d58c599509e8dc3801b0d716"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/reflectwalk"
+  packages = ["."]
+  revision = "63d60e9d0dbc60cf9164e6510889b0db6683d98c"
 
 [[projects]]
   name = "github.com/oklog/run"
@@ -170,6 +260,12 @@
   version = "v1.3.0"
 
 [[projects]]
+  name = "github.com/patrickmn/go-cache"
+  packages = ["."]
+  revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
+  version = "v2.1.0"
+
+[[projects]]
   name = "github.com/ryanuber/go-glob"
   packages = ["."]
   revision = "572520ed46dbddaed19ea3d9541bdd0494163693"
@@ -184,7 +280,7 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = ["ed25519","ed25519/internal/edwards25519"]
+  packages = ["curve25519","ed25519","ed25519/internal/edwards25519","internal/chacha20","md4","poly1305","ssh"]
   revision = "88942b9c40a4c9d203b82b3731787b672d6e809b"
 
 [[projects]]
@@ -218,8 +314,20 @@
   version = "v1.10.0"
 
 [[projects]]
+  name = "gopkg.in/inf.v0"
+  packages = ["."]
+  revision = "d2d2541c53f18d2a059457998ce2876cc8e67cbf"
+  version = "v0.9.1"
+
+[[projects]]
+  branch = "v2"
+  name = "gopkg.in/mgo.v2"
+  packages = [".","bson","internal/json","internal/sasl","internal/scram"]
+  revision = "3f83fa5005286a7fe593b055f0d7771a7dce4655"
+
+[[projects]]
   name = "gopkg.in/square/go-jose.v2"
-  packages = [".","cipher","json"]
+  packages = [".","cipher","json","jwt"]
   revision = "552e98edab5d620205ff1a8960bf52a5a10aad03"
   version = "v2.1.5"
 
@@ -232,6 +340,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "13738dd28695feb530045ae4eaea50b4ef267acd6e09271fbe0da739be187240"
+  inputs-digest = "0b7e79e5bf5efe59a4cc322da443c000524925dea2425b9c4abbb4ec9cd6c0e2"
   solver-name = "gps-cdcl"
   solver-version = 1

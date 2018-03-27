@@ -52,3 +52,8 @@
 [[constraint]]
   name = "gopkg.in/square/go-jose.v2"
   version = "2.1.5"
+
+
+[[constraint]]
+  name = "github.com/SAP/go-hdb"
+  version = "0.9.5"

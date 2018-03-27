@@ -83,19 +83,11 @@ func (backend *JwtBackend) issueToken(ctx context.Context, req *logical.Request,
 		return logical.ErrorResponse(fmt.Sprintf("Error creating token, %#v", err)), err
 	}
 
-	return &logical.Response{
-		Secret: &logical.Secret{
-			LeaseOptions: logical.LeaseOptions{
-				TTL:       tokenEntry.TTL,
-				Renewable: roleEntry.ExpirationTime,
-				IssueTime: time.Now(),
-			},
-			InternalData: tokenEntry.ToMap(),
-		},
-		Data: map[string]interface{}{
-			"token": string(token),
-		},
-	}, nil
+	response := backend.Secret(SecretJWTType).Response(map[string]interface{}{"token": string(token)}, tokenEntry.ToMap())
+	response.Secret.TTL = tokenEntry.TTL
+	response.Secret.Renewable = roleEntry.ExpirationTime
+
+	return response, nil
 }
 
 // Provides basic token validation for a provided jwt token
