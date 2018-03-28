@@ -1,0 +1,12 @@
+{
+    "key_set": "default",
+    "type": "jwt",
+    "allowed_custom_claims": [
+        "sub",
+        "name",
+        "email"
+    ],
+    "claims": {
+        "iss": "http://vandelay.com"
+    }
+}

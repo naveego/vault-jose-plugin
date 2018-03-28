@@ -63,18 +63,6 @@ var _ = Describe("BackendTests", func() {
 
 })
 
-func testAccCreateGeneratedRSAKey(name string) logicaltest.TestStep {
-	return logicaltest.TestStep{
-		Operation: logical.CreateOperation,
-		Path:      path.Join("keys", name),
-		Data: map[string]interface{}{
-			"name": name,
-			"alg":  string(jose.RS256),
-			"use":  "sig",
-		},
-	}
-}
-
 func testAccCreateRole(roleName, keySetName string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.CreateOperation,

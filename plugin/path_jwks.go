@@ -127,9 +127,25 @@ You can have the plugin generate a key for you by setting the 'alg' and 'use' pa
 
 If you already have a JWK for your key, pass it as a string to the 'jwk' parameter.
 `,
+			ExistenceCheck: func(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
+				keyName := data.Get("key_set_name").(string)
+				keySet, err := backend.getKeySetEntry(ctx, req.Storage, keyName)
+				if err != nil {
+					return false, err
+				}
+				if keySet == nil {
+					return false, err
+				}
 
+				kid := data.Get("kid").(string)
+
+				_, ok := keySet.Keys[kid]
+
+				return ok, nil
+			},
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.pathAddKeyToKeySet,
+				logical.UpdateOperation: backend.pathAddKeyToKeySet,
 				logical.ReadOperation:   backend.pathReadKeyFromKeySet,
 				logical.DeleteOperation: backend.pathDeleteKeyFromKeySet,
 			},

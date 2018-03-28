@@ -23,7 +23,7 @@ var CreateRoleSchema = map[string]*framework.FieldSchema{
 	},
 	"key_set": {
 		Type:        framework.TypeString,
-		Description: "The name of the key set to use for signing/encryption.",
+		Description: "The name of the key set to use for signing.",
 	},
 	"token_ttl": {
 		Type:        framework.TypeDurationSecond,

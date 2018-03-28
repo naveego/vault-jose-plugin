@@ -2,5 +2,7 @@
 vendor/
 vendor.orig/
 
-/build/jwt-secrets-plugin
-/build/jwt-secrets-plugin.sha
+build/jose-plugin
+build/jose-plugin.sha
+
+smoke/bin

@@ -1,0 +1,10 @@
+version: '2'
+
+services:
+  vault-jose-integration:
+    build: .
+    ports: 
+    - 8200:8200
+    cap_add: ["IPC_LOCK"]      
+    volumes:
+    - ./bin:/vault/plugins

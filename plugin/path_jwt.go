@@ -112,7 +112,6 @@ func (backend *JwtBackend) pathJwtIssue(ctx context.Context, req *logical.Reques
 
 	response := backend.Secret(SecretJWTType).Response(map[string]interface{}{"token": string(token)}, tokenEntry.ToMap())
 	response.Secret.TTL = tokenEntry.TTL
-	response.Secret.Renewable = roleEntry.ExpirationTime
 
 	return response, nil
 }

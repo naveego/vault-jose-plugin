@@ -1,0 +1,12 @@
+FROM vault:latest
+
+ENV VAULT_PORT 8200
+ENV VAULT_TOKEN ""
+ENV VAULT_ADDR "http://0.0.0.0:${VAULT_PORT}"
+ENV VAULT_CLUSTER_ADDR ""
+ENV VAULT_API_ADDR ""
+ENV VAULT_LOCAL_CONFIG '{ "plugin_directory": "/vault/plugins" }'
+ENV VAULT_DEV_ROOT_TOKEN_ID "root"
+ENV VAULT_LOG_LEVEL "trace"
+
+RUN mkdir -p /vault/file

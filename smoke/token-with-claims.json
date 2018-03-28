@@ -1,0 +1,8 @@
+{
+    "claims": {
+        "sub": "test-sub",
+        "name": "test-name",
+        "email": "test@example.com"
+    },
+    "token_ttl": 10
+}
