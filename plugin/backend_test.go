@@ -29,7 +29,7 @@ func testingFactory(ctx context.Context, conf *logical.BackendConfig) (logical.B
 var _ = Describe("BackendTests", func() {
 
 	It("should create and validate JWT", func() {
-		keyName := "test-key"
+		keySetName := "test-key"
 		roleName := "test-role"
 
 		var token *string
@@ -38,23 +38,23 @@ var _ = Describe("BackendTests", func() {
 
 			Factory: testingFactory,
 			Steps: []logicaltest.TestStep{
-				testAccCreateGeneratedRSAKey(keyName),
-				testAccCreateRole(roleName, keyName),
+				testAccAddGeneratedKeyToSet(keySetName, "key", "RS256", "sig"),
+				testAccCreateRole(roleName, keySetName),
 				testAccCreateJWT(roleName, token),
 			},
 		})
 	})
 
 	It("should read JWKS", func() {
-		keyName := "test-key"
+		keySetName := "test-key-set"
 		roleName := "test-role"
 
 		logicaltest.Test(GinkgoT(), logicaltest.TestCase{
 
 			Factory: testingFactory,
 			Steps: []logicaltest.TestStep{
-				testAccCreateGeneratedRSAKey(keyName),
-				testAccCreateRole(roleName, keyName),
+				testAccAddGeneratedKeyToSet(keySetName, "key", "RS256", "sig"),
+				testAccCreateRole(roleName, keySetName),
 				testAccReadJWKSForRole(roleName),
 			},
 		})
@@ -74,17 +74,17 @@ func testAccCreateGeneratedRSAKey(name string) logicaltest.TestStep {
 	}
 }
 
-func testAccCreateRole(roleName, keyName string) logicaltest.TestStep {
+func testAccCreateRole(roleName, keySetName string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.CreateOperation,
 		Path:      path.Join("roles", roleName),
 		Data: map[string]interface{}{
-			"name": roleName,
-			"key":  keyName,
-			"iss":  "http://127.0.0.1:8200/",
-			"aud":  "vandelay",
-			"sub":  "user",
-			"type": "jwt",
+			"name":    roleName,
+			"key_set": keySetName,
+			"iss":     "http://127.0.0.1:8200/",
+			"aud":     "vandelay",
+			"sub":     "user",
+			"type":    "jwt",
 		},
 	}
 }
@@ -93,7 +93,7 @@ func testAccReadJWKSForRole(roleName string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation:       logical.ReadOperation,
 		Unauthenticated: true,
-		Path:            path.Join("jwks", roleName),
+		Path:            path.Join("role", roleName, "jwks", "public"),
 		Check: func(resp *logical.Response) error {
 
 			bodyJSON, _ := json.Marshal(resp.Data)

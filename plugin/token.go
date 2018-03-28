@@ -87,7 +87,19 @@ func CreateJWTToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, ke
 		err error
 	)
 
-	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.SignatureAlgorithm(key.Algorithm), Key: key.Key}, (&jose.SignerOptions{}).WithType("JWT"))
+	options := (&jose.SignerOptions{}).WithType("JWT")
+
+	switch key.Key.(type) {
+	case []byte:
+		// go-jose doesn't set the kid for symmetric keys
+		options = options.WithHeader(jose.HeaderKey("kid"), key.KeyID)
+	}
+
+	sig, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(key.Algorithm),
+		Key:       &key,
+	}, options)
+
 	if err != nil {
 		return nil, err
 	}

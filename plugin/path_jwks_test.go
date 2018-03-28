@@ -17,7 +17,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("/keysets", func() {
+var _ = XDescribe("/keysets", func() {
 
 	It("should create key set and add key to it", func() {
 		keySetName := "test-key-set"
@@ -66,7 +66,7 @@ var _ = Describe("/keysets", func() {
 		})
 	})
 
-	FIt("should set active key when it exists", func() {
+	It("should set active key when it exists", func() {
 		keySetName := "test-key-set"
 		keyID1 := "test-key-id-1"
 		keyID2 := "test-key-id-2"

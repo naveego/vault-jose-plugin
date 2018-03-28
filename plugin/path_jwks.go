@@ -72,7 +72,7 @@ var keySetJWKSSchema = map[string]*framework.FieldSchema{
 	},
 }
 
-func pathKeySets(backend *JwtBackend) []*framework.Path {
+func pathJWKS(backend *JwtBackend) []*framework.Path {
 	paths := []*framework.Path{
 		&framework.Path{
 			Pattern:      "jwks",

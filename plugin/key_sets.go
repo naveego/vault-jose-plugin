@@ -75,11 +75,19 @@ func (k *KeySetStorageEntry) AddGeneratedKey(kid, alg, use string, rsaBits, symm
 
 func (k *KeySetStorageEntry) AddKey(toAdd jose.JSONWebKey) error {
 
+	if k.Keys == nil {
+		k.Keys = make(map[string]jose.JSONWebKey, 1)
+	}
+
 	if _, ok := k.Keys[toAdd.KeyID]; ok {
 		return errors.New("`kid` must be unique")
 	}
 
 	k.Keys[toAdd.KeyID] = toAdd
+
+	if k.ActiveKID == "" {
+		k.ActiveKID = toAdd.KeyID
+	}
 
 	return nil
 }

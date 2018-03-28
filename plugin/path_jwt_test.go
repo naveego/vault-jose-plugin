@@ -50,7 +50,7 @@ var _ = Describe("PathIssue", func() {
 			"iss":           "test-issuer",
 			"aud":           "test-audience",
 			"nbf":           true,
-			"key":           "test-key",
+			"key_set":       "test-key",
 			"max_token_ttl": "100s",
 			"sub":           "test-subject",
 			"token_ttl":     "5s",
@@ -69,7 +69,7 @@ var _ = Describe("PathIssue", func() {
 
 	Describe("jwt/issue/:role", func() {
 
-		It("should issue token", func() {
+		FIt("should issue token", func() {
 
 			resp, err := createToken(b, storage, roleName, time.Second*10, map[string]interface{}{
 				overridableClaimType: overridableClaimExpectedValue,

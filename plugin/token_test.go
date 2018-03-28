@@ -14,6 +14,13 @@ import (
 	. "github.com/onsi/gomega/types"
 )
 
+func testKeySetStorageEntry(alg string) (*KeySetStorageEntry, jose.JSONWebKey) {
+	k := &KeySetStorageEntry{}
+	k.AddGeneratedKey(alg+"key", alg, "sig", 2048, 256)
+	activeKey, _ := k.GetActiveKey()
+	return k, activeKey
+}
+
 var _ = Describe("ValidateJWTToken", func() {
 
 	Describe("based on signature", func() {
@@ -26,18 +33,11 @@ var _ = Describe("ValidateJWTToken", func() {
 		}
 
 		It("should support hs*", func() {
-			key := KeyStorageEntry{
-				Name: "test-key",
-				PrivateKey: &jose.JSONWebKey{
-					Key:       []byte("test-key"),
-					Algorithm: string(jose.HS256),
-				},
-			}
+			keySet, key := testKeySetStorageEntry(string(jose.HS256))
 
 			role := RoleStorageEntry{
 				Name:           "test-role",
 				Type:           "jwt",
-				Key:            key.Name,
 				TokenTTL:       time.Second * 100,
 				ExpirationTime: true,
 			}
@@ -46,21 +46,16 @@ var _ = Describe("ValidateJWTToken", func() {
 				Role: role.Name,
 			}, role, key)
 
-			Expect(ValidateJWTToken(actual, role, *key.PrivateKey)).To(Succeed())
+			Expect(ValidateJWTToken(actual, role, keySet)).To(Succeed())
 		})
 
 		It("should support rs*", func() {
 
-			key := KeyStorageEntry{
-				Name: "test-key",
-			}
-
-			Expect(GeneratePublicAndPrivateKeys(&key, string(jose.RS256), "sig")).To(Succeed())
+			keySet, key := testKeySetStorageEntry(string(jose.RS256))
 
 			role := RoleStorageEntry{
 				Name:           "test-role",
 				Type:           "jwt",
-				Key:            key.Name,
 				TokenTTL:       100,
 				ExpirationTime: true,
 			}
@@ -69,7 +64,7 @@ var _ = Describe("ValidateJWTToken", func() {
 				Role: role.Name,
 			}, role, key)
 
-			Expect(ValidateJWTToken(actual, role, *key.PrivateKey)).To(Succeed())
+			Expect(ValidateJWTToken(actual, role, keySet)).To(Succeed())
 		})
 	})
 
@@ -85,7 +80,7 @@ var _ = Describe("CreateJWTToken", func() {
 
 			actual, err := jwt.ParseSigned(string(actualBytes))
 			Expect(err).ToNot(HaveOccurred())
-			if k.PrivateKey.Algorithm == string(jose.HS256) {
+			if k.Algorithm == string(jose.HS256) {
 				Expect(actual.Claims(k, &claims, &privateClaims)).To(Succeed())
 			} else {
 				Expect(actual.Claims(k.Public(), &claims, &privateClaims)).To(Succeed())
@@ -95,25 +90,18 @@ var _ = Describe("CreateJWTToken", func() {
 		}
 
 		It("should support hs*", func() {
-			key := KeyStorageEntry{
-				Name: "test-key",
-				PrivateKey: &jose.JSONWebKey{
-					Key:       []byte("test-key"),
-					Algorithm: string(jose.HS256),
-				},
-			}
+			_, key := testKeySetStorageEntry(string(jose.HS256))
 
 			role := RoleStorageEntry{
 				Name:           "test-role",
 				Type:           "jwt",
-				Key:            key.Name,
 				TokenTTL:       100,
 				ExpirationTime: true,
 			}
 
 			claims, privateClaims := getJWT(TokenCreateEntry{
 				Role: role.Name,
-			}, role, *key.PrivateKey)
+			}, role, key)
 			Expect(claims).ToNot(BeNil())
 			Expect(privateClaims).ToNot(BeNil())
 
@@ -121,23 +109,18 @@ var _ = Describe("CreateJWTToken", func() {
 
 		It("should support rs*", func() {
 
-			key := KeyStorageEntry{
-				Name: "test-key",
-			}
-
-			Expect(GeneratePublicAndPrivateKeys(&key, string(jose.RS256), "sig")).To(Succeed())
+			_, key := testKeySetStorageEntry(string(jose.HS256))
 
 			role := RoleStorageEntry{
 				Name:           "test-role",
 				Type:           "jwt",
-				Key:            key.Name,
 				TokenTTL:       100,
 				ExpirationTime: true,
 			}
 
 			claims, privateClaims := getJWT(TokenCreateEntry{
 				Role: role.Name,
-			}, role, *key.PrivateKey)
+			}, role, key)
 			Expect(claims).ToNot(BeNil())
 			Expect(privateClaims).ToNot(BeNil())
 		})
@@ -146,7 +129,7 @@ var _ = Describe("CreateJWTToken", func() {
 
 	Describe("setting claims", func() {
 		var (
-			key  KeyStorageEntry
+			key  jose.JSONWebKey
 			role RoleStorageEntry
 		)
 
@@ -157,24 +140,17 @@ var _ = Describe("CreateJWTToken", func() {
 			actual, err := jwt.ParseSigned(string(actualBytes))
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(actual.Claims(k.PrivateKey.Key, &claims, &privateClaims)).To(Succeed())
+			Expect(actual.Claims(k.Key, &claims, &privateClaims)).To(Succeed())
 			return
 		}
 
 		BeforeEach(func() {
 
-			key = KeyStorageEntry{
-				Name: "test-key",
-				PrivateKey: &jose.JSONWebKey{
-					Key:       []byte("test-key"),
-					Algorithm: string(jose.HS256),
-				},
-			}
+			_, key = testKeySetStorageEntry(string(jose.HS256))
 
 			role = RoleStorageEntry{
 				Name: "test-role",
 				Type: "jwt",
-				Key:  key.Name,
 
 				Issuer:         "test-issuer",
 				Subject:        "test-subject",

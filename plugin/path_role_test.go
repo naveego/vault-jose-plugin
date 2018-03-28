@@ -27,7 +27,7 @@ var _ = Describe("PathRole", func() {
 			Name: roleName,
 			Type: "jwt",
 
-			Key:                 "test-key",
+			KeySet:              "test-key",
 			MaxTokenTTL:         100 * time.Second,
 			TokenTTL:            5 * time.Second,
 			Issuer:              "test-issuer",
@@ -61,7 +61,7 @@ var _ = Describe("PathRole", func() {
 
 			Expect(result.Data).To(
 				And(
-					HaveKeyWithValue("key", "test-key"),
+					HaveKeyWithValue("key_set", "test-key"),
 					HaveKeyWithValue("exp", true),
 					HaveKeyWithValue("type", "jwt"),
 					HaveKeyWithValue("sub", "test-subject"),
@@ -134,4 +134,5 @@ var _ = Describe("PathRole", func() {
 		})
 
 	})
+
 })
