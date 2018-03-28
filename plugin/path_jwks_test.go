@@ -17,7 +17,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = XDescribe("/keysets", func() {
+var _ = Describe("/keysets", func() {
 
 	It("should create key set and add key to it", func() {
 		keySetName := "test-key-set"

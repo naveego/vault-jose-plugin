@@ -56,7 +56,7 @@ in addition to the standard registered claims configured directly on the role (i
 func pathRole(backend *JwtBackend) []*framework.Path {
 	paths := []*framework.Path{
 		&framework.Path{
-			Pattern:      fmt.Sprintf("roles/%s/jwks/public", framework.GenericNameRegex("name")),
+			Pattern:      fmt.Sprintf("roles/jwks/%s", framework.GenericNameRegex("name")),
 			HelpSynopsis: "Returns the JWKS for the keys used by this role.",
 			Fields: map[string]*framework.FieldSchema{
 				"name": {

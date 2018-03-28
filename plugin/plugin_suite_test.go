@@ -3,9 +3,8 @@ package josejwt_test
 import (
 	"context"
 	"fmt"
+	"path"
 	"testing"
-
-	"gopkg.in/square/go-jose.v2"
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -31,23 +30,18 @@ func getTestBackend() (logical.Backend, logical.Storage) {
 	return b, config.StorageView
 }
 
-func createKey(b logical.Backend, storage logical.Storage, data map[string]interface{}) (*logical.Response, error) {
+func createSigningKeyForAlg(b logical.Backend, storage logical.Storage, keySetName, kid, alg string) (*logical.Response, error) {
 
-	key := data["jwk"]
-	if key != nil {
-		if webKey, ok := key.(jose.JSONWebKey); ok {
-			raw, err := webKey.MarshalJSON()
-			Expect(err).ToNot(HaveOccurred())
-
-			Expect(webKey.UnmarshalJSON(raw)).To(Succeed())
-			data["jwk"] = string(raw)
-		}
+	data := map[string]interface{}{
+		"kid": kid,
+		"alg": alg,
+		"use": "sig",
 	}
 
 	req := &logical.Request{
 		Storage:   storage,
 		Operation: logical.CreateOperation,
-		Path:      fmt.Sprintf("keys/%s", data["name"]),
+		Path:      path.Join("jwks", keySetName, kid),
 		Data:      data,
 	}
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"time"
 
 	"github.com/hashicorp/vault/logical"
 	logicaltest "github.com/hashicorp/vault/logical/testing"
@@ -32,7 +33,7 @@ var _ = Describe("BackendTests", func() {
 		keySetName := "test-key"
 		roleName := "test-role"
 
-		var token *string
+		token := new(string)
 
 		logicaltest.Test(GinkgoT(), logicaltest.TestCase{
 
@@ -85,6 +86,8 @@ func testAccCreateRole(roleName, keySetName string) logicaltest.TestStep {
 			"aud":     "vandelay",
 			"sub":     "user",
 			"type":    "jwt",
+			// allow custom 'exp' to let us create expired tokens
+			"allowed_custom_claims": []string{"exp", "overridable"},
 		},
 	}
 }
@@ -93,7 +96,7 @@ func testAccReadJWKSForRole(roleName string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation:       logical.ReadOperation,
 		Unauthenticated: true,
-		Path:            path.Join("role", roleName, "jwks", "public"),
+		Path:            path.Join("roles/jwks", roleName),
 		Check: func(resp *logical.Response) error {
 
 			bodyJSON, _ := json.Marshal(resp.Data)
@@ -121,10 +124,6 @@ func testAccCreateJWT(roleName string, token *string) logicaltest.TestStep {
 		Path:      path.Join("jwt/issue", roleName),
 		Data: map[string]interface{}{
 			"name": roleName,
-			"iss":  "http://127.0.0.1:8200/",
-			"aud":  "vandelay",
-			"sub":  "user",
-			"type": "jwt",
 		},
 		Check: func(resp *logical.Response) error {
 
@@ -138,7 +137,36 @@ func testAccCreateJWT(roleName string, token *string) logicaltest.TestStep {
 				return errors.New("token was not a string")
 			}
 
-			token = &tokenString
+			*token = tokenString
+			return nil
+
+		},
+	}
+}
+
+func testAccCreateExpiredJWT(roleName string, token *string) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.CreateOperation,
+		Path:      path.Join("jwt/issue", roleName),
+		Data: map[string]interface{}{
+			"name": roleName,
+			"claims": map[string]interface{}{
+				"exp": time.Now().Add(-5 * time.Minute).Unix(),
+			},
+		},
+		Check: func(resp *logical.Response) error {
+
+			tokenRaw, ok := resp.Data["token"]
+			if !ok {
+				return errors.New("token was missing from data")
+			}
+
+			tokenString, ok := tokenRaw.(string)
+			if !ok {
+				return errors.New("token was not a string")
+			}
+
+			*token = tokenString
 			return nil
 
 		},

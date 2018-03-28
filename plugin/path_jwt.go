@@ -47,6 +47,8 @@ func pathJWT(backend *JwtBackend) []*framework.Path {
 			Pattern: fmt.Sprintf("jwt/issue/%s", framework.GenericNameRegex("role")),
 			Fields:  createTokenSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.ReadOperation:   backend.pathJwtIssue,
+				logical.CreateOperation: backend.pathJwtIssue,
 				logical.UpdateOperation: backend.pathJwtIssue,
 			},
 		},
@@ -54,6 +56,7 @@ func pathJWT(backend *JwtBackend) []*framework.Path {
 			Pattern: fmt.Sprintf("jwt/validate/%s", framework.GenericNameRegex("role")),
 			Fields:  validateTokenSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.CreateOperation: backend.pathJwtValidate,
 				logical.UpdateOperation: backend.pathJwtValidate,
 			},
 		},

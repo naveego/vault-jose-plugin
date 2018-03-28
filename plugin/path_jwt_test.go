@@ -2,7 +2,9 @@ package josejwt_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"path"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -14,6 +16,7 @@ import (
 	"github.com/SermoDigital/jose/jws"
 
 	"github.com/hashicorp/vault/logical"
+	logicaltest "github.com/hashicorp/vault/logical/testing"
 )
 
 const (
@@ -29,7 +32,6 @@ var _ = Describe("PathIssue", func() {
 	var (
 		b        logical.Backend
 		storage  logical.Storage
-		keyEntry map[string]interface{}
 		roleData map[string]interface{}
 		roleName string
 	)
@@ -37,11 +39,7 @@ var _ = Describe("PathIssue", func() {
 	BeforeEach(func() {
 		roleName = "test-role"
 		b, storage = getTestBackend()
-		keyEntry = map[string]interface{}{
-			"name": keyName,
-			"jwk":  jose.JSONWebKey{Key: []byte("test-key"), Algorithm: string(jose.HS256)},
-		}
-		Expect(createKey(b, storage, keyEntry)).ToNot(HaveLogicalError())
+		Expect(createSigningKeyForAlg(b, storage, "test-key-set", "test-key", string(jose.HS256))).ToNot(HaveLogicalError())
 
 		roleData = map[string]interface{}{
 			"name": roleName,
@@ -50,7 +48,7 @@ var _ = Describe("PathIssue", func() {
 			"iss":           "test-issuer",
 			"aud":           "test-audience",
 			"nbf":           true,
-			"key_set":       "test-key",
+			"key_set":       "test-key-set",
 			"max_token_ttl": "100s",
 			"sub":           "test-subject",
 			"token_ttl":     "5s",
@@ -69,7 +67,7 @@ var _ = Describe("PathIssue", func() {
 
 	Describe("jwt/issue/:role", func() {
 
-		FIt("should issue token", func() {
+		It("should issue token", func() {
 
 			resp, err := createToken(b, storage, roleName, time.Second*10, map[string]interface{}{
 				overridableClaimType: overridableClaimExpectedValue,
@@ -100,52 +98,40 @@ var _ = Describe("PathIssue", func() {
 	Describe("token/validate/:role", func() {
 
 		It("should return is_valid=true if token is valid", func() {
-			resp, err := createToken(b, storage, roleName, time.Second*10, nil)
-			Expect(resp, err).ToNot(HaveLogicalError())
-			Expect(resp.Data).To(HaveKeyWithValue("token", BeAssignableToTypeOf("")))
-			token := resp.Data["token"].(string)
 
-			req := &logical.Request{
-				Storage: storage,
-				Data: map[string]interface{}{
-					"token": token,
-					"role":  roleName,
+			keySetName := "test-key"
+			roleName := "test-role"
+
+			token := new(string)
+
+			logicaltest.Test(GinkgoT(), logicaltest.TestCase{
+
+				Factory: testingFactory,
+				Steps: []logicaltest.TestStep{
+					testAccAddGeneratedKeyToSet(keySetName, "key", "RS256", "sig"),
+					testAccCreateRole(roleName, keySetName),
+					testAccCreateJWT(roleName, token),
+					testAccValidateJWT(roleName, token, true),
 				},
-				Path:      fmt.Sprintf("jwt/validate/%s", roleName),
-				Operation: logical.UpdateOperation,
-			}
-
-			resp, err = b.HandleRequest(context.Background(), req)
-			Expect(resp, err).ToNot(HaveLogicalError())
-
-			Expect(resp.Data).To(HaveKeyWithValue("is_valid", true))
+			})
 		})
 
 		It("should return is_valid=false and error=... if token is expired", func() {
-			exp := time.Now().Add(time.Hour * -1000)
-			resp, err := createToken(b, storage, roleName, time.Second*1, map[string]interface{}{
-				"exp": exp.Unix(),
-			})
+			keySetName := "test-key"
+			roleName := "test-role"
 
-			Expect(resp, err).ToNot(HaveLogicalError())
-			Expect(resp.Data).To(HaveKeyWithValue("token", BeAssignableToTypeOf("")))
-			token := resp.Data["token"].(string)
+			token := new(string)
 
-			req := &logical.Request{
-				Storage: storage,
-				Data: map[string]interface{}{
-					"token": token,
-					"role":  roleName,
+			logicaltest.Test(GinkgoT(), logicaltest.TestCase{
+
+				Factory: testingFactory,
+				Steps: []logicaltest.TestStep{
+					testAccAddGeneratedKeyToSet(keySetName, "key", "RS256", "sig"),
+					testAccCreateRole(roleName, keySetName),
+					testAccCreateExpiredJWT(roleName, token),
+					testAccValidateJWT(roleName, token, false),
 				},
-				Path:      fmt.Sprintf("jwt/validate/%s", roleName),
-				Operation: logical.UpdateOperation,
-			}
-
-			resp, err = b.HandleRequest(context.Background(), req)
-			Expect(resp, err).ToNot(HaveLogicalError())
-
-			Expect(resp.Data).To(HaveKeyWithValue("is_valid", false))
-			Expect(resp.Data).To(HaveKeyWithValue("error", ContainSubstring("token is expired")))
+			})
 		})
 	})
 })
@@ -171,4 +157,46 @@ func createToken(b logical.Backend, storage logical.Storage, roleName string, tt
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	return resp, err
+}
+
+func testAccValidateJWT(roleName string, token *string, expectValid bool) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.UpdateOperation,
+		Path:      path.Join("jwt/validate", roleName),
+		Data: map[string]interface{}{
+			"name": roleName,
+		},
+		PreFlight: func(req *logical.Request) error {
+
+			jwt, err := jws.ParseJWT([]byte(*token))
+			Expect(err).ToNot(HaveOccurred())
+			exp, _ := jwt.Claims().Expiration()
+			fmt.Printf("token expires: %s", exp)
+
+			req.Data["token"] = *token
+			return nil
+		},
+		Check: func(resp *logical.Response) error {
+
+			isValid := resp.Data["is_valid"].(bool)
+
+			if isValid {
+				if expectValid {
+					return nil
+				}
+				return errors.New("expected token to be invalid but it was valid")
+			}
+
+			if expectValid {
+				return errors.New("expected token to be valid but it was invalid")
+			}
+
+			err := resp.Data["error"].(string)
+			if err == "" {
+				return errors.New("token was invalid but error was set")
+			}
+
+			return nil
+		},
+	}
 }

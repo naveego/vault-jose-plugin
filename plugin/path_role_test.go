@@ -3,6 +3,7 @@ package josejwt_test
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/hashicorp/vault/logical"
@@ -135,4 +136,33 @@ var _ = Describe("PathRole", func() {
 
 	})
 
+	Describe("read roles/:name/jwks/public", func() {
+
+		It("should return jwks", func() {
+
+			roleName := "test-role"
+			keySetName := "test-key-set"
+			keyID := "test-key-id"
+
+			Expect(createSigningKeyForAlg(b, storage, keySetName, keyID, "RS256")).NotTo(HaveLogicalError())
+
+			Expect(createRole(b, storage, RoleStorageEntry{
+				Name:   roleName,
+				Type:   "jwt",
+				KeySet: keySetName,
+			}.ToMap())).ToNot(HaveLogicalError())
+
+			result, err := b.HandleRequest(context.Background(), &logical.Request{
+				Operation: logical.ReadOperation,
+				Path:      path.Join("roles/jwks", roleName),
+				Storage:   storage,
+			})
+			Expect(result, err).ToNot(HaveLogicalError())
+			Expect(result.Data).To(And(
+				HaveKeyWithValue("keys", HaveLen(1)),
+			))
+
+		})
+
+	})
 })

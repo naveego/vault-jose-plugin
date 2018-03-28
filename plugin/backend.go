@@ -39,6 +39,7 @@ func Backend(ctx context.Context, conf *logical.BackendConfig) *JwtBackend {
 			Unauthenticated: []string{
 				"jwt/validate/*",
 				"jwks/*",
+				"roles/jwks/*",
 			},
 			SealWrapStorage: []string{
 				"keys/",
