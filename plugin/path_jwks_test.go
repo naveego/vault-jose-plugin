@@ -48,6 +48,7 @@ var _ = Describe("/keysets", func() {
 				testAccAddGeneratedKeyToSet(keySetName, "eckey", "ES256", "sig"),
 				testAccAddGeneratedKeyToSet(keySetName, "symmetric-key", "HS256", "sig"),
 				testAccReadJWKS(keySetName, 2),
+				testAccListKeys(keySetName, 3),
 			},
 		})
 	})
@@ -123,6 +124,23 @@ func testAccListKeySets(name string) logicaltest.TestStep {
 			}
 
 			return fmt.Errorf("did not find keyset name %q in data %#v", name, resp.Data)
+		},
+	}
+}
+
+func testAccListKeys(keySetName string, keyCount int) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.ListOperation,
+		Path:      path.Join("jwks", keySetName),
+		Check: func(resp *logical.Response) error {
+
+			keys := resp.Data["keys"].([]string)
+
+			if len(keys) != keyCount {
+				return fmt.Errorf("expected list to have %d entries but there were %d", keyCount, len(keys))
+			}
+
+			return nil
 		},
 	}
 }

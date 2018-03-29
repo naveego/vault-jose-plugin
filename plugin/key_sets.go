@@ -2,11 +2,17 @@ package josejwt
 
 import (
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
+	"golang.org/x/crypto/ed25519"
 	jose "gopkg.in/square/go-jose.v2"
 
 	"github.com/hashicorp/vault/logical"
@@ -92,6 +98,10 @@ func (k *KeySetStorageEntry) AddKey(toAdd jose.JSONWebKey) error {
 	return nil
 }
 
+func (k *KeySetStorageEntry) Exists(kid string) bool {
+	_, ok := k.Keys[kid]
+	return ok
+}
 func (k *KeySetStorageEntry) RemoveKey(kid string) {
 	delete(k.Keys, kid)
 }
@@ -128,6 +138,22 @@ func (k *KeySetStorageEntry) GetActiveKey() (jose.JSONWebKey, error) {
 	}
 
 	return key, nil
+}
+
+func (k *KeySetStorageEntry) PublicKeyAsMap(kid string) (m map[string]interface{}) {
+	jwk, ok := k.Keys[kid]
+	if !ok {
+		return nil
+	}
+
+	switch jwk.Key.(type) {
+	case []byte:
+		return nil
+	}
+
+	j, _ := jwk.Public().MarshalJSON()
+	_ = json.Unmarshal(j, &m)
+	return
 }
 
 func (backend *JwtBackend) getKeySetEntry(ctx context.Context, storage logical.Storage, keyName string) (*KeySetStorageEntry, error) {
@@ -179,4 +205,80 @@ func (backend *JwtBackend) setKeySetEntry(ctx context.Context, storage logical.S
 	}
 
 	return nil
+}
+
+// KeygenSig generates keypair for corresponding SignatureAlgorithm.
+func KeygenSig(alg jose.SignatureAlgorithm, bits int) (crypto.PublicKey, crypto.PrivateKey, error) {
+	switch alg {
+	case jose.ES256, jose.ES384, jose.ES512, jose.EdDSA:
+		keylen := map[jose.SignatureAlgorithm]int{
+			jose.ES256: 256,
+			jose.ES384: 384,
+			jose.ES512: 521, // sic!
+			jose.EdDSA: 256,
+		}
+		if bits != 0 && bits != keylen[alg] {
+			return nil, nil, errors.New("this `alg` does not support arbitrary key length")
+		}
+	case jose.RS256, jose.RS384, jose.RS512, jose.PS256, jose.PS384, jose.PS512:
+		if bits == 0 {
+			bits = 2048
+		}
+		if bits < 2048 {
+			return nil, nil, errors.New("too short key for RSA `alg`, 2048+ is required")
+		}
+	}
+	switch alg {
+	case jose.ES256:
+		// The cryptographic operations are implemented using constant-time algorithms.
+		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		return key.Public(), key, err
+	case jose.ES384:
+		// NB: The cryptographic operations do not use constant-time algorithms.
+		key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+		return key.Public(), key, err
+	case jose.ES512:
+		// NB: The cryptographic operations do not use constant-time algorithms.
+		key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		return key.Public(), key, err
+	case jose.EdDSA:
+		pub, key, err := ed25519.GenerateKey(rand.Reader)
+		return pub, key, err
+	case jose.RS256, jose.RS384, jose.RS512, jose.PS256, jose.PS384, jose.PS512:
+		key, err := rsa.GenerateKey(rand.Reader, bits)
+		return key.Public(), key, err
+	default:
+		return nil, nil, errors.New("unknown `alg` for `use` = `sig`")
+	}
+}
+
+// KeygenEnc generates keypair for corresponding KeyAlgorithm.
+func KeygenEnc(alg jose.KeyAlgorithm, bits int) (crypto.PublicKey, crypto.PrivateKey, error) {
+	switch alg {
+	case jose.RSA1_5, jose.RSA_OAEP, jose.RSA_OAEP_256:
+		if bits == 0 {
+			bits = 2048
+		}
+		if bits < 2048 {
+			return nil, nil, errors.New("too short key for RSA `alg`, 2048+ is required")
+		}
+		key, err := rsa.GenerateKey(rand.Reader, bits)
+		return key.Public(), key, err
+	case jose.ECDH_ES, jose.ECDH_ES_A128KW, jose.ECDH_ES_A192KW, jose.ECDH_ES_A256KW:
+		var crv elliptic.Curve
+		switch bits {
+		case 0, 256:
+			crv = elliptic.P256()
+		case 384:
+			crv = elliptic.P384()
+		case 521:
+			crv = elliptic.P521()
+		default:
+			return nil, nil, errors.New("unknown elliptic curve bit length, use one of 256, 384, 521")
+		}
+		key, err := ecdsa.GenerateKey(crv, rand.Reader)
+		return key.Public(), key, err
+	default:
+		return nil, nil, errors.New("unknown `alg` for `use` = `enc`")
+	}
 }

@@ -50,7 +50,6 @@ func Backend(ctx context.Context, conf *logical.BackendConfig) *JwtBackend {
 		},
 		Paths: framework.PathAppend(
 			pathJWT(backend),
-			pathKeys(backend),
 			pathJWKS(backend),
 			pathRole(backend),
 			pathConfigLease(backend),

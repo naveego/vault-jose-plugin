@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
-
-	"github.com/hashicorp/go-uuid"
 
 	"github.com/hashicorp/vault/logical/framework"
 
@@ -72,25 +69,37 @@ var keySetJWKSSchema = map[string]*framework.FieldSchema{
 	},
 }
 
+const keySetHelpDescription = `
+This endpoint allows you to manage key sets. 
+
+You can create or delete a key set, or set the active key.
+
+You can add keys to a key set, either by providing an existing key or
+by asking the key set to generate one.
+
+If you add a key to a keyset that does not exist, the key set will be created 
+and set as the active key. This makes it easy to create key sets that only
+contain one key: 
+
+	vault write jose/jwks/<key_set_name>/<kid> alg=... use=...
+
+`
+
 func pathJWKS(backend *JwtBackend) []*framework.Path {
 	paths := []*framework.Path{
 		&framework.Path{
-			Pattern:      "jwks",
-			HelpSynopsis: "Key sets.",
-			HelpDescription: `
-
-			`,
+			Pattern:         "jwks/?$",
+			HelpSynopsis:    "Key sets.",
+			HelpDescription: keySetHelpDescription,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.ListOperation: backend.pathListKeySets,
 			},
 		},
 		&framework.Path{
-			Pattern:      fmt.Sprintf("jwks/%s", framework.GenericNameRegex("name")),
-			Fields:       keySetSchema,
-			HelpSynopsis: "This path handles CRUD operations on key sets.",
-			HelpDescription: `
-
-			`,
+			Pattern:         fmt.Sprintf("jwks/%s/?$", framework.GenericNameRegex("name")),
+			Fields:          keySetSchema,
+			HelpSynopsis:    "This path handles CRUD operations on key sets.",
+			HelpDescription: keySetHelpDescription,
 			ExistenceCheck: func(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
 				keyName := data.Get("name").(string)
 				key, err := backend.getKeySetEntry(ctx, req.Storage, keyName)
@@ -110,7 +119,9 @@ func pathJWKS(backend *JwtBackend) []*framework.Path {
 			Fields:       keySetJWKSSchema,
 			HelpSynopsis: "This public JWKS endpoint.",
 			HelpDescription: `
+This endpoint returns the JWKS formatted representation of the key set.
 
+You do not need to be authenticated to request this resource.
 			`,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.ReadOperation: backend.pathReadKeySetPublic,
@@ -270,30 +281,31 @@ func (backend *JwtBackend) pathAddKeyToKeySet(ctx context.Context, req *logical.
 	if kid == "" {
 		return logical.ErrorResponse("missing key id"), nil
 	}
-	if kid == "new" {
-		// new kid is a timestamp with a random suffix
-		r, err := uuid.GenerateRandomBytes(5)
-		if err != nil {
-			return logical.ErrorResponse("error generating key id"), err
-		}
-
-		kid = fmt.Sprintf("%d_%s", time.Now().Unix(), string(r))
-	}
 
 	makeActive := data.Get("active").(bool)
 
 	name := data.Get("key_set_name").(string)
-	key, err := backend.getKeySetEntry(ctx, req.Storage, name)
+	keySet, err := backend.getKeySetEntry(ctx, req.Storage, name)
 	if err != nil {
 		return logical.ErrorResponse("invalid key set"), err
 	}
 
-	if key == nil {
+	if keySet == nil {
 		makeActive = true
-		key = &KeySetStorageEntry{
+		keySet = &KeySetStorageEntry{
 			Name: name,
 			Keys: make(map[string]jose.JSONWebKey),
 		}
+	}
+
+	if keySet.Exists(kid) {
+		return &logical.Response{
+			Data: keySet.PublicKeyAsMap(kid),
+			Warnings: []string{
+				fmt.Sprintf("A key with kid=%s already exists. Existing keys cannot be modified. To replace the key, delete it and add a new key with the same ID.", kid),
+			},
+		}, nil
+
 	}
 
 	if jwtRaw, ok := data.GetOk("jwt"); ok {
@@ -304,7 +316,7 @@ func (backend *JwtBackend) pathAddKeyToKeySet(ctx context.Context, req *logical.
 
 		jsonWebKey.KeyID = kid
 
-		if err := key.AddKey(*jsonWebKey); err != nil {
+		if err := keySet.AddKey(*jsonWebKey); err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("invalid request: %s", err)), nil
 		}
 	} else {
@@ -325,22 +337,24 @@ func (backend *JwtBackend) pathAddKeyToKeySet(ctx context.Context, req *logical.
 		rsaBits = data.Get("rsa_bits").(int)
 		symmetricBits = data.Get("symmetric_bits").(int)
 
-		if err := key.AddGeneratedKey(kid, alg.(string), use.(string), rsaBits, symmetricBits); err != nil {
+		if err := keySet.AddGeneratedKey(kid, alg.(string), use.(string), rsaBits, symmetricBits); err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("invalid key parameters: %s", err)), nil
 		}
 	}
 
-	if makeActive || key.ActiveKID == "" {
-		if err := key.SetActiveKID(kid); err != nil {
+	if makeActive || keySet.ActiveKID == "" {
+		if err := keySet.SetActiveKID(kid); err != nil {
 			return nil, fmt.Errorf("the key we just added (with `kid` %q) is missing: %s", kid, err)
 		}
 	}
 
-	if err := backend.setKeySetEntry(ctx, req.Storage, key); err != nil {
+	if err := backend.setKeySetEntry(ctx, req.Storage, keySet); err != nil {
 		return logical.ErrorResponse("error saving key set"), err
 	}
 
-	return &logical.Response{Data: key.ToMap()}, nil
+	return &logical.Response{
+		Data: keySet.PublicKeyAsMap(kid),
+	}, nil
 }
 
 func (backend *JwtBackend) pathDeleteKeyFromKeySet(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
