@@ -97,7 +97,7 @@ var _ = Describe("PathIssue", func() {
 
 	Describe("token/validate/:role", func() {
 
-		It("should return is_valid=true if token is valid", func() {
+		It("should return is_valid=true if token is valid for generated key", func() {
 
 			keySetName := "test-key"
 			roleName := "test-role"
@@ -109,6 +109,25 @@ var _ = Describe("PathIssue", func() {
 				Factory: testingFactory,
 				Steps: []logicaltest.TestStep{
 					testAccAddGeneratedKeyToSet(keySetName, "key", "RS256", "sig"),
+					testAccCreateRole(roleName, keySetName),
+					testAccCreateJWT(roleName, token),
+					testAccValidateJWT(roleName, token, true),
+				},
+			})
+		})
+
+		It("should return is_valid=true if token is valid for provided key", func() {
+
+			keySetName := "test-key"
+			roleName := "test-role"
+
+			token := new(string)
+
+			logicaltest.Test(GinkgoT(), logicaltest.TestCase{
+
+				Factory: testingFactory,
+				Steps: []logicaltest.TestStep{
+					testAccAddKeyToSet(keySetName, "key", "RS256", "sig", "pem", []byte(rsaPEM)),
 					testAccCreateRole(roleName, keySetName),
 					testAccCreateJWT(roleName, token),
 					testAccValidateJWT(roleName, token, true),

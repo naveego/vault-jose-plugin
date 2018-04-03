@@ -10,6 +10,8 @@ import (
 	. "github.com/naveego/vault-jose-plugin/plugin"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/json"
 )
 
 var _ = Describe("PathRole", func() {
@@ -161,6 +163,17 @@ var _ = Describe("PathRole", func() {
 			Expect(result.Data).To(And(
 				HaveKeyWithValue("keys", HaveLen(1)),
 			))
+
+			bodyJSON, _ := json.Marshal(result.Data)
+
+			var keySet jose.JSONWebKeySet
+
+			Expect(json.Unmarshal(bodyJSON, &keySet)).To(Succeed())
+
+			for i, key := range keySet.Keys {
+				Expect(key.Valid()).To(BeTrue())
+				Expect(key.IsPublic()).To(BeTrue(), "KEY AT INDEX %d INCLUDED PRIVATE KEY DATA", i)
+			}
 
 		})
 

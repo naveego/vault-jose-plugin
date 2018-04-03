@@ -108,7 +108,7 @@ func (backend *JwtBackend) pathReadRoleJWKS(ctx context.Context, req *logical.Re
 
 	for kid := range keySetEntry.Keys {
 		key := keySetEntry.GetPublicKey(kid)
-		if key != nil {
+		if key.Valid() && key.IsPublic() {
 			keys = append(keys, key)
 		}
 	}

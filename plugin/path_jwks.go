@@ -36,6 +36,10 @@ var addKeySchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "The JWK for the key, as a string.",
 	},
+	"pem": {
+		Type:        framework.TypeString,
+		Description: "The PEM-encoded data for the key. If you use this parameter you must also pass the `alg` parameter.",
+	},
 	"use": {
 		Type:        framework.TypeString,
 		Description: "The usage of this key, 'enc' or 'sig'. Required if 'jwk' is not set.",
@@ -134,9 +138,11 @@ You do not need to be authenticated to request this resource.
 			HelpDescription: `
 Write to this endpoint to add a key to a key set. 
 
-You can have the plugin generate a key for you by setting the 'alg' and 'use' parameters.
+You can have the plugin generate a key for you by setting the 'alg' and 'use' parameters and not setting 'jwk', 'pem', or 'der'.
 
-If you already have a JWK for your key, pass it as a string to the 'jwk' parameter.
+If you already have a key, you can provide it in JWK or PEM format using the 'jwk' or 'pem' parameters.
+
+If you use the PEM format you must set 'alg' and 'use' as well.
 `,
 			ExistenceCheck: func(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
 				keyName := data.Get("key_set_name").(string)
@@ -208,7 +214,7 @@ func (backend *JwtBackend) pathReadKeySetPublic(ctx context.Context, req *logica
 
 	for kid := range keySet.Keys {
 		key := keySet.GetPublicKey(kid)
-		if key != nil {
+		if key.Valid() && key.IsPublic() {
 			keys = append(keys, key)
 		}
 	}
@@ -302,44 +308,65 @@ func (backend *JwtBackend) pathAddKeyToKeySet(ctx context.Context, req *logical.
 		return &logical.Response{
 			Data: keySet.PublicKeyAsMap(kid),
 			Warnings: []string{
-				fmt.Sprintf("A key with kid=%s already exists. Existing keys cannot be modified. To replace the key, delete it and add a new key with the same ID.", kid),
+				fmt.Sprintf("A key with kid=%s already exists. Existing keys cannot be modified. If you really need to modify a key, delete it and add a new key with the same ID. This will break all tokens using that key.", kid),
 			},
 		}, nil
 
 	}
 
+	jsonWebKey := new(jose.JSONWebKey)
+	alg := data.Get("alg").(string)
+	use := data.Get("use").(string)
+
 	if jwtRaw, ok := data.GetOk("jwt"); ok {
-		var jsonWebKey *jose.JSONWebKey
+
 		if err := jsonWebKey.UnmarshalJSON([]byte(jwtRaw.(string))); err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("invalid jwt: %s", err)), nil
 		}
 
 		jsonWebKey.KeyID = kid
 
-		if err := keySet.AddKey(*jsonWebKey); err != nil {
-			return logical.ErrorResponse(fmt.Sprintf("invalid request: %s", err)), nil
-		}
 	} else {
-		var (
-			alg           interface{}
-			use           interface{}
-			rsaBits       int
-			symmetricBits int
-			ok            bool
-		)
-		if alg, ok = data.GetOk("alg"); !ok {
-			return logical.ErrorResponse("if `jwt` is not provided you must provide `alg`"), nil
+
+		if alg == "" {
+			return logical.ErrorResponse("if `jwk` is not provided you must provide `alg`"), nil
 		}
-		if use, ok = data.GetOk("use"); !ok {
-			return logical.ErrorResponse("if `jwt` is not provided you must provide `use`"), nil
+		if use == "" {
+			return logical.ErrorResponse("if `jwk` is not provided you must provide `use`"), nil
 		}
 
-		rsaBits = data.Get("rsa_bits").(int)
-		symmetricBits = data.Get("symmetric_bits").(int)
+		if pemRaw, ok := data.GetOk("pem"); ok {
 
-		if err := keySet.AddGeneratedKey(kid, alg.(string), use.(string), rsaBits, symmetricBits); err != nil {
-			return logical.ErrorResponse(fmt.Sprintf("invalid key parameters: %s", err)), nil
+			privateKey, err := LoadPrivateKey([]byte(pemRaw.(string)))
+
+			if err != nil {
+				return logical.ErrorResponse(fmt.Sprintf("could not decode PEM: %s", err)), nil
+			}
+
+			jsonWebKey.Key = privateKey
+
+			jsonWebKey.Algorithm = alg
+			jsonWebKey.Use = use
+			jsonWebKey.KeyID = kid
+
+		} else {
+			var (
+				rsaBits       int
+				symmetricBits int
+			)
+
+			rsaBits = data.Get("rsa_bits").(int)
+			symmetricBits = data.Get("symmetric_bits").(int)
+
+			jsonWebKey, err = GenerateKey(kid, alg, use, rsaBits, symmetricBits)
+			if err != nil {
+				return logical.ErrorResponse(fmt.Sprintf("invalid key parameters: %s", err)), nil
+			}
 		}
+	}
+
+	if err := keySet.AddKey(*jsonWebKey); err != nil {
+		return logical.ErrorResponse(fmt.Sprintf("invalid request: %s", err)), nil
 	}
 
 	if makeActive || keySet.ActiveKID == "" {
@@ -397,7 +424,7 @@ func (backend *JwtBackend) pathReadKeyFromKeySet(ctx context.Context, req *logic
 
 	key := keySet.GetPublicKey(kid)
 
-	if key == nil {
+	if !key.Valid() {
 		if _, ok := keySet.Keys[kid]; ok {
 			return logical.ErrorResponse("key is symmetric"), nil
 		}

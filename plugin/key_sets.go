@@ -7,7 +7,9 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
@@ -34,52 +36,15 @@ func (k *KeySetStorageEntry) ToMap() map[string]interface{} {
 	}
 }
 
-// AddGeneratedKey generates a new key and adds it.
-func (k *KeySetStorageEntry) AddGeneratedKey(kid, alg, use string, rsaBits, symmetricBits int) error {
-
-	var (
-		key     jose.JSONWebKey
-		privKey interface{}
-		err     error
-	)
-
-	symmetric := alg[:2] == "HS"
-
-	if !strings.HasPrefix(alg, "RS") {
-		rsaBits = 0
-	}
-
-	if symmetric {
-		b := make([]byte, symmetricBits)
-		privKey = b
-		_, err = rand.Read(b)
-		if err != nil {
-			return err
-		}
-
-	} else {
-		switch use {
-		case "sig":
-			_, privKey, err = KeygenSig(jose.SignatureAlgorithm(alg), rsaBits)
-		case "enc":
-			_, privKey, err = KeygenEnc(jose.KeyAlgorithm(alg), rsaBits)
-		}
-	}
-	if err != nil {
-		return err
-	}
-
-	key = jose.JSONWebKey{Key: privKey, KeyID: kid, Algorithm: alg, Use: use}
-
-	if !symmetric {
-		if key.IsPublic() || !key.Valid() {
-			return errors.New("invalid key was generated")
-		}
-	}
-	return k.AddKey(key)
-}
-
 func (k *KeySetStorageEntry) AddKey(toAdd jose.JSONWebKey) error {
+
+	if !toAdd.Valid() && toAdd.Algorithm[0:2]!="HS" {
+		return errors.New("key was invalid")
+	}
+
+	if toAdd.IsPublic() {
+		return errors.New("key was a public key")
+	}
 
 	if k.Keys == nil {
 		k.Keys = make(map[string]jose.JSONWebKey, 1)
@@ -106,18 +71,13 @@ func (k *KeySetStorageEntry) RemoveKey(kid string) {
 	delete(k.Keys, kid)
 }
 
-func (k *KeySetStorageEntry) GetPublicKey(kid string) interface{} {
+func (k *KeySetStorageEntry) GetPublicKey(kid string) jose.JSONWebKey {
 	if key, ok := k.Keys[kid]; ok {
 
-		switch key.Key.(type) {
-		case []byte:
-			return nil
-		default:
-			return key
-		}
+		return key.Public()
 	}
 
-	return nil
+	return jose.JSONWebKey{}
 }
 
 func (k *KeySetStorageEntry) SetActiveKID(kid string) error {
@@ -207,6 +167,42 @@ func (backend *JwtBackend) setKeySetEntry(ctx context.Context, storage logical.S
 	return nil
 }
 
+func GenerateKey(kid, alg, use string, rsaBits, symmetricBits int) (*jose.JSONWebKey, error) {
+
+	var (
+		privKey interface{}
+		err     error
+	)
+
+	symmetric := alg[:2] == "HS"
+
+	if !strings.HasPrefix(alg, "RS") {
+		rsaBits = 0
+	}
+
+	if symmetric {
+		b := make([]byte, symmetricBits)
+		privKey = b
+		_, err = rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		switch use {
+		case "sig":
+			_, privKey, err = KeygenSig(jose.SignatureAlgorithm(alg), rsaBits)
+		case "enc":
+			_, privKey, err = KeygenEnc(jose.KeyAlgorithm(alg), rsaBits)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &jose.JSONWebKey{Key: privKey, KeyID: kid, Algorithm: alg, Use: use}, nil
+}
+
 // KeygenSig generates keypair for corresponding SignatureAlgorithm.
 func KeygenSig(alg jose.SignatureAlgorithm, bits int) (crypto.PublicKey, crypto.PrivateKey, error) {
 	switch alg {
@@ -281,4 +277,31 @@ func KeygenEnc(alg jose.KeyAlgorithm, bits int) (crypto.PublicKey, crypto.Privat
 	default:
 		return nil, nil, errors.New("unknown `alg` for `use` = `enc`")
 	}
+}
+
+func LoadPrivateKey(data []byte) (interface{}, error) {
+	input := data
+
+	block, _ := pem.Decode(data)
+	if block != nil {
+		input = block.Bytes
+	}
+
+	var priv interface{}
+	priv, err0 := x509.ParsePKCS1PrivateKey(input)
+	if err0 == nil {
+		return priv, nil
+	}
+
+	priv, err1 := x509.ParsePKCS8PrivateKey(input)
+	if err1 == nil {
+		return priv, nil
+	}
+
+	priv, err2 := x509.ParseECPrivateKey(input)
+	if err2 == nil {
+		return priv, nil
+	}
+
+	return nil, fmt.Errorf("parse error, got '%s', '%s', and '%s'", err0, err1, err2)
 }

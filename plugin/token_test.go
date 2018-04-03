@@ -16,8 +16,11 @@ import (
 
 func testKeySetStorageEntry(alg string) (*KeySetStorageEntry, jose.JSONWebKey) {
 	k := &KeySetStorageEntry{}
-	k.AddGeneratedKey(alg+"key", alg, "sig", 2048, 256)
-	activeKey, _ := k.GetActiveKey()
+	generatedKey, err := GenerateKey(alg+"key", alg, "sig", 2048, 256)
+	Expect(err).ToNot(HaveOccurred(), "should generate key")
+	Expect(k.AddKey(*generatedKey)).To(Succeed())
+	activeKey, err := k.GetActiveKey()
+	Expect(err).ToNot(HaveOccurred(), "should get active key")
 	return k, activeKey
 }
 

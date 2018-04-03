@@ -17,6 +17,34 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
+const rsaPEM = `-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAslWybuiNYR7uOgKuvaBwqVk8saEutKhOAaW+3hWF65gJei+Z
+V8QFfYDxs9ZaRZlWAUMtncQPnw7ZQlXO9ogN5cMcN50C6qMOOZzghK7danalhF5l
+UETC4Hk3Eisbi/PR3IfVyXaRmqL6X66MKj/JAKyD9NFIDVy52K8A198Jojnrw2+X
+XQW72U68fZtvlyl/BTBWQ9Re5JSTpEcVmpCR8FrFc0RPMBm+G5dRs08vvhZNiTT2
+JACO5V+J5ZrgP3s5hnGFcQFZgDnXLInDUdoi1MuCjaAU0ta8/08pHMijNix5kFof
+dPEB954MiZ9k4kQ5/utt02I9x2ssHqw71ojjvwIDAQABAoIBABrYDYDmXom1BzUS
+PE1s/ihvt1QhqA8nmn5i/aUeZkc9XofW7GUqq4zlwPxKEtKRL0IHY7Fw1s0hhhCX
+LA0uE7F3OiMg7lR1cOm5NI6kZ83jyCxxrRx1DUSO2nxQotfhPsDMbaDiyS4WxEts
+0cp2SYJhdYd/jTH9uDfmt+DGwQN7Jixio1Dj3vwB7krDY+mdre4SFY7Gbk9VxkDg
+LgCLMoq52m+wYufP8CTgpKFpMb2/yJrbLhuJxYZrJ3qd/oYo/91k6v7xlBKEOkwD
+2veGk9Dqi8YPNxaRktTEjnZb6ybhezat93+VVxq4Oem3wMwou1SfXrSUKtgM/p2H
+vfw/76ECgYEA2fNL9tC8u9M0wjA+kvvtDG96qO6O66Hksssy6RWInD+Iqk3MtHQt
+LeoCjvX+zERqwOb6SI6empk5pZ9E3/9vJ0dBqkxx3nqn4M/nRWnExGgngJsL959t
+f50cdxva8y1RjNhT4kCwTrupX/TP8lAG8SfG1Alo2VFR8iWd8hDQcTECgYEA0Xfj
+EgqAsVh4U0s3lFxKjOepEyp0G1Imty5J16SvcOEAD1Mrmz94aSSp0bYhXNVdbf7n
+Rk77htWC7SE29fGjOzZRS76wxj/SJHF+rktHB2Zt23k1jBeZ4uLMPMnGLY/BJ099
+5DTGo0yU0rrPbyXosx+ukfQLAHFuggX4RNeM5+8CgYB7M1J/hGMLcUpjcs4MXCgV
+XXbiw2c6v1r9zmtK4odEe42PZ0cNwpY/XAZyNZAAe7Q0stxL44K4NWEmxC80x7lX
+ZKozz96WOpNnO16qGC3IMHAT/JD5Or+04WTT14Ue7UEp8qcIQDTpbJ9DxKk/eglS
+jH+SIHeKULOXw7fSu7p4IQKBgBnyVchIUMSnBtCagpn4DKwDjif3nEY+GNmb/D2g
+ArNiy5UaYk5qwEmV5ws5GkzbiSU07AUDh5ieHgetk5dHhUayZcOSLWeBRFCLVnvU
+i0nZYEZNb1qZGdDG8zGcdNXz9qMd76Qy/WAA/nZT+Zn1AiweAovFxQ8a/etRPf2Z
+DbU1AoGAHpCgP7B/4GTBe49H0AQueQHBn4RIkgqMy9xiMeR+U+U0vaY0TlfLhnX+
+5PkNfkPXohXlfL7pxwZNYa6FZhCAubzvhKCdUASivkoGaIEk6g1VTVYS/eDVQ4CA
+slfl+elXtLq/l1kQ8C14jlHrQzSXx4PQvjDEnAmaHSJNz4mP9Fg=
+-----END RSA PRIVATE KEY-----`
+
 var _ = Describe("/keysets", func() {
 
 	It("should create key set and add key to it", func() {
@@ -29,6 +57,23 @@ var _ = Describe("/keysets", func() {
 				testAccCreateKeySet(keySetName),
 				testAccListKeySets(keySetName),
 				testAccAddGeneratedKeyToSet(keySetName, keyID, "RS256", "sig"),
+				testAccListKeysInKeySet(keySetName, keyID),
+				testAccReadPublicKey(keySetName, keyID),
+				testAccReadJWKS(keySetName, 1),
+			},
+		})
+	})
+
+	It("should set key from PEM", func() {
+		keySetName := "test-key-set"
+		keyID := "test-key-id"
+
+		logicaltest.Test(GinkgoT(), logicaltest.TestCase{
+			Factory: testingFactory,
+			Steps: []logicaltest.TestStep{
+				testAccCreateKeySet(keySetName),
+				testAccListKeySets(keySetName),
+				testAccAddKeyToSet(keySetName, keyID, "RS256", "sig", "pem", []byte(rsaPEM)),
 				testAccListKeysInKeySet(keySetName, keyID),
 				testAccReadPublicKey(keySetName, keyID),
 				testAccReadJWKS(keySetName, 1),
@@ -166,6 +211,15 @@ func testAccReadJWKS(keySetName string, keyCount int) logicaltest.TestStep {
 				return fmt.Errorf("expected %d keys in key set but found %d", keyCount, len(keySet.Keys))
 			}
 
+			for i, key := range keySet.Keys {
+				if !key.Valid() {
+					return fmt.Errorf("key at index %d was invalid", i)
+				}
+				if !key.IsPublic() {
+					return fmt.Errorf("KEY AT INDEX %d INCLUDED PRIVATE KEY DATA", i)
+				}
+			}
+
 			return nil
 		},
 	}
@@ -245,6 +299,20 @@ func testAccAddGeneratedKeyToSet(keySetName, kid, alg, use string) logicaltest.T
 			"kid":          kid,
 			"alg":          alg,
 			"use":          use,
+		},
+	}
+}
+
+func testAccAddKeyToSet(keySetName, kid, alg, use, encoding string, data []byte) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.CreateOperation,
+		Path:      path.Join("jwks", keySetName, kid),
+		Data: map[string]interface{}{
+			"key_set_name": keySetName,
+			"kid":          kid,
+			"alg":          alg,
+			"use":          use,
+			encoding:       string(data),
 		},
 	}
 }
