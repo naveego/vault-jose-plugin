@@ -17,7 +17,7 @@ RUN dep ensure -v --vendor-only
 
 ADD . .
 
-#RUN go test -v ./...
+RUN go test -v ./...
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s" -a -installsuffix cgo -o build/jose-plugin
 RUN shasum -a 256 -p build/jose-plugin | cut -d ' ' -f 1 > "build/jose-plugin.sha"
 
