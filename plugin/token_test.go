@@ -231,6 +231,20 @@ var _ = Describe("CreateJWTToken", func() {
 					HaveKeyWithValue("custom", "original-custom-value"),
 				)
 			})
+
+			It("should override registered claims if allowed as custom claims", func() {
+				role.AllowedCustomClaims = []string{"nbf"}
+				now := time.Now().Add(time.Hour * -48).Unix()
+				_, privateClaims := getJWT(TokenCreateEntry{
+					Role: role.Name,
+					Claims: map[string]interface{}{
+						"nbf": now,
+					},
+				}, role, key)
+				Expect(privateClaims).To(
+					HaveKeyWithValue("nbf", BeNumerically("~", now)),
+				)
+			})
 		})
 	})
 
