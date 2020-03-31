@@ -35,16 +35,20 @@ ENV VAULT_LOG_LEVEL "trace"
 
 RUN mkdir -p /vault/plugins
 RUN mkdir -p /vault/data
+RUN mkdir /app 
 
 EXPOSE ${VAULT_PORT}
 
 WORKDIR /vault/plugins
 COPY --from=builder /go/src/github.com/naveego/vault-jose-plugin/build /vault/plugins
 
-ADD ./test ./test
-RUN chmod a+x ./test/*.sh
 
-ENTRYPOINT [ "./test/start_vault.sh" ]
+# When using this in -dev mode, Vault will load all plugins in the plugins folder
+# having the test files there was an error
+ADD ./test /app/
+RUN chmod a+x /app/*.sh
+
+ENTRYPOINT [ "/app/start_vault.sh" ]
 
 # mount point for a vault config
 VOLUME [ "/vault/config" ]
