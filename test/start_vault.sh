@@ -96,6 +96,6 @@ if [ "$1" = 'vault' ]; then
     fi
 fi
 
-/vault/plugins/test/install_in_docker.sh &
+/app/install_in_docker.sh &
 
 exec "$@"
