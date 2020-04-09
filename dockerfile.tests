@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s" -a -installsuffix cgo -o bui
 RUN shasum -a 256 build/jose-plugin | cut -d ' ' -f 1 > build/jose-plugin.sha
 
 ## build the docker container with vault and the plugin mounted
-FROM vault:0.11.6
+FROM vault:0.11.0
 
 ENV VAULT_PORT 8200
 ENV VAULT_TOKEN ""
