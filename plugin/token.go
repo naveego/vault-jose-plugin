@@ -124,7 +124,8 @@ func CreateJWTToken(createEntry TokenCreateEntry, roleEntry RoleStorageEntry, ke
 		claims.Expiry = jwt.NewNumericDate(utc)
 	}
 	if roleEntry.NotBefore {
-		claims.NotBefore = jwt.NewNumericDate(time.Now())
+		fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
+		claims.NotBefore = jwt.NewNumericDate(fiveMinutesAgo)
 	}
 	if roleEntry.IssuedAt {
 		claims.IssuedAt = jwt.NewNumericDate(time.Now())

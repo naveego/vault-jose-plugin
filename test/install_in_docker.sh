@@ -20,6 +20,10 @@ vault auth enable approle
 # enable database plugin
 vault secrets enable database
 
+# enable secrets kv
+vault secrets enable -path=naveego-secrets kv
+vault secrets enable -path=tenant-secrets kv
+
 # install the jwt plugin
 vault write sys/plugins/catalog/jose sha_256=$(cat /vault/plugins/jose-plugin.sha) command=jose-plugin
 

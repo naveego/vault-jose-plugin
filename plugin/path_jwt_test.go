@@ -81,6 +81,7 @@ var _ = Describe("PathIssue", func() {
 			jwt, err := jws.ParseJWT([]byte(token))
 			Expect(err).ToNot(HaveOccurred())
 
+			fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
 			Expect(jwt.Claims()).To(
 				And(
 					HaveKeyWithValue("aud", ContainElement("test-audience")),
@@ -88,7 +89,7 @@ var _ = Describe("PathIssue", func() {
 					HaveKeyWithValue("iss", roleData["iss"]),
 					HaveKeyWithValue(customClaimTye, customClaimValue),
 					HaveKeyWithValue(overridableClaimType, overridableClaimExpectedValue),
-					HaveKeyWithValue("nbf", BeFloatTimestampCloseTo(time.Now(), time.Second)),
+					HaveKeyWithValue("nbf", BeFloatTimestampCloseTo(fiveMinutesAgo, time.Second)),
 					HaveKeyWithValue("iat", BeFloatTimestampCloseTo(time.Now(), time.Second)),
 					HaveKeyWithValue("exp", BeFloatTimestampCloseTo(time.Now().Add(time.Second*10), time.Second)),
 				))
