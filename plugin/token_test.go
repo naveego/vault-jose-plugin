@@ -179,7 +179,8 @@ var _ = Describe("CreateJWTToken", func() {
 				Time:     time.Now(),
 			}))
 
-			Expect(claims.NotBefore.Time()).To(BeTemporally("~", time.Now(), time.Second))
+			fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
+			Expect(claims.NotBefore.Time()).To(BeTemporally("~", fiveMinutesAgo, time.Second))
 			Expect(claims.IssuedAt.Time()).To(BeTemporally("~", time.Now(), time.Second))
 			Expect(claims.Expiry.Time()).To(BeTemporally("~", time.Now().Add(role.TokenTTL), time.Second))
 		})
