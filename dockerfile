@@ -1,4 +1,4 @@
-FROM golang:latest as builder
+FROM golang:1.11 as builder
 
 WORKDIR /go/src/github.com/naveego/vault-jose-plugin
 
@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s" -a -installsuffix cgo -o bui
 RUN shasum -a 256 -p build/jose-plugin | cut -d ' ' -f 1 > "build/jose-plugin.sha"
 
 ## build the docker container with vault and the plugin mounted
-FROM vault:latest
+FROM vault:0.11.1
 
 ENV VAULT_PORT 8200
 ENV VAULT_TOKEN ""
