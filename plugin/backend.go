@@ -2,13 +2,13 @@ package josejwt
 
 import (
 	"context"
+	"github.com/hashicorp/vault/sdk/plugin"
 	"log"
 	"os"
 
-	"github.com/hashicorp/vault/helper/pluginutil"
-	"github.com/hashicorp/vault/logical"
-	"github.com/hashicorp/vault/logical/framework"
-	"github.com/hashicorp/vault/logical/plugin"
+	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/hashicorp/vault/api"
 )
 
 // JwtBackend export type backend for use else where
@@ -62,12 +62,12 @@ func Backend(ctx context.Context, conf *logical.BackendConfig) *JwtBackend {
 
 // the main app, this will accept the api meta data and tokens from vault
 func main() {
-	apiClientMeta := &pluginutil.APIClientMeta{}
+	apiClientMeta := &api.PluginAPIClientMeta{}
 	flags := apiClientMeta.FlagSet()
 	flags.Parse(os.Args[1:])
 
 	tlsConfig := apiClientMeta.GetTLSConfig()
-	tlsProviderFunc := pluginutil.VaultPluginTLSProvider(tlsConfig)
+	tlsProviderFunc := api.VaultPluginTLSProvider(tlsConfig)
 
 	if err := plugin.Serve(&plugin.ServeOpts{
 		BackendFactoryFunc: Factory,
