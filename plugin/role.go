@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/fatih/structs"
-	"github.com/hashicorp/vault/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 // RoleStorageEntry structure that represents the role as it is stored within vault

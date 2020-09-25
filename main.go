@@ -4,22 +4,22 @@ import (
 	"log"
 	"os"
 
-	"github.com/hashicorp/vault/helper/pluginutil"
-	"github.com/hashicorp/vault/logical/plugin"
+	"github.com/hashicorp/vault/api"
+	sdk "github.com/hashicorp/vault/sdk/plugin"
 	"github.com/naveego/vault-jose-plugin/plugin"
 )
 
 func main() {
-	apiClientMeta := &pluginutil.APIClientMeta{}
+	apiClientMeta := &api.PluginAPIClientMeta{}
 	flags := apiClientMeta.FlagSet()
 	flags.Parse(os.Args[1:]) // Ignore command, strictly parse flags
 
 	tlsConfig := apiClientMeta.GetTLSConfig()
-	tlsProviderFunc := pluginutil.VaultPluginTLSProvider(tlsConfig)
+	tlsProviderFunc := api.VaultPluginTLSProvider(tlsConfig)
 
 	factoryFunc := josejwt.Factory
 
-	err := plugin.Serve(&plugin.ServeOpts{
+	err := sdk.Serve(&sdk.ServeOpts{
 		BackendFactoryFunc: factoryFunc,
 		TLSProviderFunc:    tlsProviderFunc,
 	})

@@ -17,7 +17,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 	jose "gopkg.in/square/go-jose.v2"
 
-	"github.com/hashicorp/vault/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 // KeySetStorageEntry strutcure defines the type of object that is stored
