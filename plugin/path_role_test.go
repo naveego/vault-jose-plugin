@@ -6,7 +6,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/hashicorp/vault/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 	. "github.com/naveego/vault-jose-plugin/plugin"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

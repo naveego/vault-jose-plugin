@@ -8,8 +8,8 @@ import (
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/json"
 
-	"github.com/hashicorp/vault/logical"
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	"github.com/hashicorp/vault/sdk/logical"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
 
 	// hold on to reference so dep doesn't lose it
 	_ "github.com/SAP/go-hdb/driver"
