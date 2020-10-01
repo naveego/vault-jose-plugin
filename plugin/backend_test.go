@@ -7,8 +7,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/hashicorp/vault/logical"
-	logicaltest "github.com/hashicorp/vault/logical/testing"
+	"github.com/hashicorp/vault/sdk/logical"
+	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
 
 	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/json"

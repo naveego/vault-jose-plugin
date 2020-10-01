@@ -3,7 +3,7 @@ package josejwt_test
 import (
 	"context"
 
-	"github.com/hashicorp/vault/logical"
+	"github.com/hashicorp/vault/sdk/logical"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
